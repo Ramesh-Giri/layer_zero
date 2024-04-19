@@ -1,0 +1,3 @@
+Wallet Address: 0x471b0994a7075731cbf5825975933c05584f1d8d
+Mnemonic: broom moon cheese inmate blouse valid palm extend reject smoke trumpet huge
+Private Key: 8c42f3ba2ecb15928c66e675355cc7afc21101a498e442e66dbaa897f0cd78d4
