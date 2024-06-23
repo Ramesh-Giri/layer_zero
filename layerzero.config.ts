@@ -4,12 +4,12 @@ import type { OAppOmniGraphHardhat, OmniPointHardhat } from '@layerzerolabs/tool
 
 const sepoliaContract: OmniPointHardhat = {
     eid: EndpointId.SEPOLIA_V2_TESTNET,
-    contractName: 'ApuOFT'
+    contractName: 'WhaleOFT'
 }
 
-const baseSepoliacContract: OmniPointHardhat = {
+const baseTestContract: OmniPointHardhat = {
     eid: EndpointId.BASESEP_V2_TESTNET,
-    contractName: 'ApuOFT'
+    contractName: 'WhaleOFT'
 }
 
 
@@ -18,18 +18,19 @@ const config: OAppOmniGraphHardhat = {
         {
             contract: sepoliaContract,
         },
-        {
-            contract: baseSepoliacContract,
+        
+         {
+            contract: baseTestContract,
         }
     ],
     connections: [
 
         {
             from: sepoliaContract,
-            to: baseSepoliacContract,
+            to: baseTestContract,
         },
         {
-            from: baseSepoliacContract,
+            from: baseTestContract,
             to: sepoliaContract,
         }
     ],

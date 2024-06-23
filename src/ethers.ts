@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import { EndpointId, } from "@layerzerolabs/lz-definitions";
 import { Interface } from "ethers/lib/utils";
 
-const tokenABI = require('./abi/ApuTokens.json').abi;
+const tokenABI = require('./abi/WhaleTokens.json');
 
 //import OptionsBuilder from "../contracts/OptionsBuilder.sol";
 
@@ -14,8 +14,9 @@ import { Options } from '@layerzerolabs/lz-v2-utilities';
 dotenv.config();
 
 const MNEMONIC = process.env.MNEMONIC;
-const RPC_URL = 'https://sepolia.base.org';
 
+const RPC_URL_SOURCE = 'https://sepolia.base.org';
+const RPC_URL_DESTINATION = 'https://sepolia.infura.io/v3/6ae62b79ee1341898f1ac24796ada458';
 
 if (!MNEMONIC) {
     console.error('MNEMONIC not found in environment variables');
@@ -23,44 +24,47 @@ if (!MNEMONIC) {
 }
 
 
-/* -------------------------------- ERC 20 contract (SOURCE: SEPOLIA)-------------------------------- */
+const SOURCE_ENDPOINT_ID = '40245';  // here base 
+const DESTINATION_ENDPOINT_ID = '40161';  // here sepolia 
+
+
+/* -------------------------------- ERC 20 contract ( SOURCE:  here: BASE_ SEP)-------------------------------- */
 
 // Using Sepolia network's Infura endpoint
-const sepoliaProvider = new ethers.providers.JsonRpcProvider('https://sepolia.infura.io/v3/6ae62b79ee1341898f1ac24796ada458');
+const sourceProvider = new ethers.providers.JsonRpcProvider(RPC_URL_SOURCE);
 
 // Connect to the Ethereum network
 // Create a wallet from the mnemonic
-const wallet = ethers.Wallet.fromMnemonic(MNEMONIC);
+const walletSource = ethers.Wallet.fromMnemonic(MNEMONIC);
 
-// Connect the wallet to the provider to create a si    gner
-const signer = wallet.connect(sepoliaProvider);
+// Connect the wallet to the provider to create a signer
+const signer = walletSource.connect(sourceProvider);
 
-const apuERC20Address = '0xD0e2d531762C4b8E9228aD28e87dbA20595Cc987'; //ERC token address deployed on Sepolia
-const apuERC20Contract = new ethers.Contract(apuERC20Address, tokenABI, signer);
-
-
+const whaleERC20Address = '0xCa8e44C73cDCA309EA7615bC74fC1452BE9B3e49'; //ERC token address deployed on source
+const whaleERC20Contract = new ethers.Contract(whaleERC20Address, tokenABI, signer);
 
 
-/* -------------------------------- OFT on Base (destination: BASE) -------------------------------- */
-const OFT_ABI = require('../artifacts/contracts/ApuOFT.sol/ApuOFT.json').abi;
-const providerBase = new ethers.providers.JsonRpcProvider(RPC_URL);
-const walletBase = ethers.Wallet.fromMnemonic(MNEMONIC).connect(providerBase);
+/* -------------------------------- OFT on Base (destination: here: Sepolia) -------------------------------- */
+const OFT_ABI = require('../artifacts/contracts/WhaleOFT.sol/WhaleOFT.json').abi;
 
-const apuOFTAddress = '0x6Bd2CfE7050969631e90869d18dbdaDc765A7468';
+const destinationProvider = new ethers.providers.JsonRpcProvider(RPC_URL_DESTINATION);
+const walletDestination = ethers.Wallet.fromMnemonic(MNEMONIC).connect(destinationProvider);
 
-const oftContract = new ethers.Contract(apuOFTAddress, OFT_ABI, walletBase);
+const destinationOftAddress = '0x57827B96CE8f99eed1925c2DfEfb67186FB57915';
+
+const destinationOFTContract = new ethers.Contract(destinationOftAddress, OFT_ABI, walletDestination);
 
 const userAddress = "0x3b3d39D059C7C4F14C827E4f32793fe8f2F13F3C";
 
 
-/* -------------------------------- OFT Adapter (SOURCE: SEPOLIA)-------------------------------- */
+/* -------------------------------- OFT Adapter (SOURCE: here: SEPOLIA)-------------------------------- */
 
-const ADAPTER_ABI = require('../artifacts/contracts/ApuAdapter.sol/ApuAdapter.json').abi;
-const walletAdapter = ethers.Wallet.fromMnemonic(MNEMONIC).connect(sepoliaProvider);
+const ADAPTER_ABI = require('../artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json').abi;
+const walletAdapter = ethers.Wallet.fromMnemonic(MNEMONIC).connect(sourceProvider);
 
-const adapterAddress = '0x4894503c0261493b9DE02b207b6CbD9db7974F52';
+const sourceAdapterAddress = '0x13baE193504AEc9Cb0103d500417ED80058939d4';
 
-const adapterContract = new ethers.Contract(adapterAddress, ADAPTER_ABI, walletAdapter);
+const sourceAdapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
 
 // Function to Set Enforced Options
 // Function to Set Enforced Options
@@ -83,17 +87,17 @@ async function setEnforcedOptions() {
 
     const enforcedOptions = [
         {
-            eid: 40245,
+            eid: DESTINATION_ENDPOINT_ID,
             msgType: 1,
             options: optionsData
         }
     ];
 
     try {
-        const nonce = await sepoliaProvider.getTransactionCount(wallet.address, 'latest'); // Get the current nonce
+        const nonce = await sourceProvider.getTransactionCount(walletSource.address, 'latest'); // Get the current nonce
 
         console.log('Sending transaction with nonce:', nonce);
-        const txResponse = await adapterContract.setEnforcedOptions(enforcedOptions, {
+        const txResponse = await sourceAdapterContract.setEnforcedOptions(enforcedOptions, {
             gasLimit: 1000000, // Adjusted gas limit if needed
             gasPrice: ethers.utils.parseUnits("23", "gwei"), // Adjust gas price if needed
             nonce: nonce // Explicitly set the nonce
@@ -105,7 +109,7 @@ async function setEnforcedOptions() {
         console.log('Transaction confirmed in block:', receipt.blockNumber);
 
 
-        await estimateSendFees(40245, "1000", false, optionsData);
+        await estimateSendFees(DESTINATION_ENDPOINT_ID, "1000", false, optionsData);
     } catch (error) {
         console.error('Error setting enforced options:', error);
     }
@@ -116,23 +120,23 @@ async function setEnforcedOptions() {
 async function setPeerContracts() {
     try {
 
-        const OFTAddressBytes32 = ethers.utils.hexZeroPad(apuOFTAddress, 32);
-        const adapterAddressBytes32 = ethers.utils.hexZeroPad(adapterAddress, 32);
+        const destinationOFTBytes32 = ethers.utils.hexZeroPad(destinationOftAddress, 32);
+        const sourceAdapterBytes32 = ethers.utils.hexZeroPad(sourceAdapterAddress, 32);
 
 
-        const isAdapterPeerOfOFT = await oftContract.isPeer(40161, adapterAddressBytes32); // 40161 is sepolia endpint id
-        const isOFTPeerOfAdapter = await adapterContract.isPeer(40245, OFTAddressBytes32); // 40245 is base endpoint id
+        const isAdapterPeerOfOFT = await destinationOFTContract.isPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32); //  SOURCE endpint id
+        const isOFTPeerOfAdapter = await sourceAdapterContract.isPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32); //  DESTINATION endpoint id
 
         if (!isAdapterPeerOfOFT || !isOFTPeerOfAdapter) {
             console.log("Pairing...");
 
             console.log("Pending hereee");
-            const txAdapter = await adapterContract.setPeer(40245, OFTAddressBytes32);
+            const txAdapter = await sourceAdapterContract.setPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
             console.log("Pending hereee");
             await txAdapter.wait();
             console.log("Peered OFT to Adapter");
 
-            const tx = await oftContract.setPeer(40161, adapterAddressBytes32);
+            const tx = await destinationOFTContract.setPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32);
             await tx.wait();
             console.log("Peered Adapter to OFT");
 
@@ -152,7 +156,7 @@ async function setPeerContracts() {
 
 async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boolean, encodedOptions: any) {
 
-    const currentBalance = await apuERC20Contract.balanceOf(wallet.address);
+    const currentBalance = await whaleERC20Contract.balanceOf(walletSource.address);
     console.log(`Current token balance: ${ethers.utils.formatUnits(currentBalance, 18)}`);
 
     // Parse the amount to the correct unit
@@ -161,7 +165,7 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
     console.log(`Attempting to approve ${ethers.utils.formatUnits(approvalAmount, 18)} tokens`);
 
     // Approve the OFT contract to move your tokens on both networks
-    const approveTx = await apuERC20Contract.approve(adapterAddress, approvalAmount);
+    const approveTx = await whaleERC20Contract.approve(sourceAdapterAddress, approvalAmount);
     await approveTx.wait(); // Wait for the first approval to complete
 
     console.log(`Approval transaction hash: ${approveTx.hash}`);
@@ -169,7 +173,7 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
 
     const _sendParam = {
         dstEid: dstEid,
-        to: ethers.utils.hexZeroPad(wallet.address, 32),
+        to: ethers.utils.hexZeroPad(walletSource.address, 32),
         amountLD: ethers.utils.parseUnits(amountToSend, 18),
         minAmountLD: ethers.utils.parseUnits(amountToSend, 18),
         extraOptions: encodedOptions,
@@ -181,10 +185,10 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
 
 
     try {
-        const adapterContract = new ethers.Contract(adapterAddress, ADAPTER_ABI, walletAdapter);
+        const adapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
 
 
-        if (!ethers.utils.isAddress(apuOFTAddress)) {
+        if (!ethers.utils.isAddress(destinationOftAddress)) {
             throw new Error("Invalid OFT address");
         }
         if (!approvalAmount.gt(0)) {
@@ -197,7 +201,7 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
 
         console.log(`Estimated fees: ${ethers.utils.formatUnits(feeEstimate.nativeFee, "ether")} ETH, ${ethers.utils.formatUnits(feeEstimate.lzTokenFee, 18)} LZT`);
 
-        await sendTokensToBase(amountToSend, feeEstimate, encodedOptions);
+        //await sendTokensToDestination(amountToSend, feeEstimate, encodedOptions);
 
     } catch (error) {
         console.error(`Error estimating fees: ${error}`);
@@ -205,72 +209,83 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
 
 }
 
-async function sendTokensToBase(amountToSend: any, msgFee: any, encodedOptions: any) {
-    try {
-        // Validate input parameters
-        if (!amountToSend || parseFloat(amountToSend) <= 0) {
-            throw new Error("Invalid or zero amount to send specified.");
-        }
-        if (!ethers.utils.isAddress(apuOFTAddress)) {
-            throw new Error("Invalid OFT address specified.");
-        }
+// Uncommit this to send tokens.
 
-        // Parse the amount to the correct unit
-        const approvalAmount = ethers.utils.parseUnits(amountToSend.toString(), 18);
+// async function sendTokensToDestination(amountToSend: any, msgFee: any, encodedOptions: any) {
+//     try {
+//         // Validate input parameters
+//         if (!amountToSend || parseFloat(amountToSend) <= 0) {
+//             throw new Error("Invalid or zero amount to send specified.");
+//         }
+//         if (!ethers.utils.isAddress(destinationOftAddress)) {
+//             throw new Error("Invalid OFT address specified.");
+//         }
 
-        // Prepare the send parameters
-        const sendParam = {
-            dstEid: 40245,
-            to: ethers.utils.hexZeroPad(wallet.address, 32),
-            amountLD: approvalAmount,
-            minAmountLD: approvalAmount,
-            extraOptions: encodedOptions,
-            composeMsg: ethers.utils.toUtf8Bytes(""),
-            oftCmd: ethers.utils.toUtf8Bytes("")
-        };
+//         // Parse the amount to the correct unit
+//         const approvalAmount = ethers.utils.parseUnits(amountToSend.toString(), 18);
 
-        const fee = {
-            nativeFee: msgFee.nativeFee, // Assuming this contains only the nativeFee
-            lzTokenFee: msgFee.lzTokenFee // Assuming this contains the LZ token fee
-        };
+//         // Prepare the send parameters
+//         const sendParam = {
+//             dstEid: DESTINATION_ENDPOINT_ID,
+//             to: ethers.utils.hexZeroPad(walletSource.address, 32),
+//             amountLD: approvalAmount,
+//             minAmountLD: approvalAmount,
+//             extraOptions: encodedOptions,
+//             composeMsg: ethers.utils.toUtf8Bytes(""),
+//             oftCmd: ethers.utils.toUtf8Bytes("")
+//         };
 
-        const adapterContract = new ethers.Contract(adapterAddress, ADAPTER_ABI, walletAdapter);
+//         const fee = {
+//             nativeFee: msgFee.nativeFee, // Assuming this contains only the nativeFee
+//             lzTokenFee: msgFee.lzTokenFee // Assuming this contains the LZ token fee
+//         };
 
-        console.log(sendParam);
-        console.log(msgFee);
+//         const adapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
 
-
-        const refundAddress = wallet.address; // Assuming refund should go to the sender's wallet address
-
-
-        // Sending tokens, passing msgFee as transaction options
-
-        const txResponse = await adapterContract.send(
-            sendParam,
-            fee,
-            refundAddress, // Pass the refund address
-            {
-                value: msgFee.nativeFee, // Ensure to pass the payable amount if required
-                gasLimit: 2000000,
-                gasPrice: ethers.utils.parseUnits("17", "gwei")
-            }
-        );
+//         console.log(sendParam);
+//         console.log(msgFee);
 
 
-        console.log(`Transaction Hash: ${txResponse.hash}`);
+//         const refundAddress = walletSource.address; // Assuming refund should go to the sender's wallet address
 
-        // Wait for the transaction to be mined
-        const receipt = await txResponse.wait();
-        console.log(`    confirmed in block: ${receipt.blockNumber}`);
+//                 // Get and print the user's balance before sending tokens
+//                 const balanceBefore = await signer.getBalance();
+//                 console.log(`Balance before transaction: ${ethers.utils.formatEther(balanceBefore)} ETH`);
+        
+//         // Sending tokens, passing msgFee as transaction options
 
-        return receipt; // Returning the receipt might be useful for further processing
+//         const txResponse = await adapterContract.send(
+//             sendParam,
+//             fee,
+//             refundAddress, // Pass the refund address
+//             {
+//                 value: msgFee.nativeFee, // Ensure to pass the payable amount if required
+//                 gasLimit: 2300000,
+//                 gasPrice: ethers.utils.parseUnits("17", "gwei")
+//             }
+//         );
 
-    } catch (error) {
-        // Log detailed error message and rethrow or handle appropriately
-        console.error('Failed to send tokens:', error);
-        throw error; // Rethrowing the error is useful if you want calling functions to handle it
-    }
-}
+
+//         console.log(`Transaction Hash: ${txResponse.hash}`);
+
+//         // Wait for the transaction to be mined
+//         const receipt = await txResponse.wait();
+//         console.log(`    confirmed in block: ${receipt.blockNumber}`);
+
+
+//         // Get and print the user's balance after sending tokens
+//         const balanceAfter = await signer.getBalance();
+//         console.log(`Balance after transaction: ${ethers.utils.formatEther(balanceAfter)} ETH`);
+
+
+//         return receipt; // Returning the receipt might be useful for further processing
+
+//     } catch (error) {
+//         // Log detailed error message and rethrow or handle appropriately
+//         console.error('Failed to send tokens:', error);
+//         throw error; // Rethrowing the error is useful if you want calling functions to handle it
+//     }
+// }
 
 
 
