@@ -13,19 +13,19 @@ import { Options } from '@layerzerolabs/lz-v2-utilities';
 // Load environment variables from .env file
 dotenv.config();
 
-const MNEMONIC = process.env.MNEMONIC;
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
-const RPC_URL_SOURCE = 'https://sepolia.base.org';
-const RPC_URL_DESTINATION = 'https://sepolia.infura.io/v3/6ae62b79ee1341898f1ac24796ada458';
+const RPC_URL_SOURCE = 'https://mainnet.base.org';
+const RPC_URL_DESTINATION = 'https://mainnet.infura.io/v3/6ae62b79ee1341898f1ac24796ada458';
 
-if (!MNEMONIC) {
+if (!PRIVATE_KEY) {
     console.error('MNEMONIC not found in environment variables');
     process.exit(1);
 }
 
 
-const SOURCE_ENDPOINT_ID = '40245';  // here base 
-const DESTINATION_ENDPOINT_ID = '40161';  // here sepolia 
+const SOURCE_ENDPOINT_ID = '30184';  // here base 
+const DESTINATION_ENDPOINT_ID = '30101';  // here eth 
 
 
 /* -------------------------------- ERC 20 contract ( SOURCE:  here: BASE_ SEP)-------------------------------- */
@@ -35,12 +35,12 @@ const sourceProvider = new ethers.providers.JsonRpcProvider(RPC_URL_SOURCE);
 
 // Connect to the Ethereum network
 // Create a wallet from the mnemonic
-const walletSource = ethers.Wallet.fromMnemonic(MNEMONIC);
+const walletSource = new ethers.Wallet(PRIVATE_KEY);
 
 // Connect the wallet to the provider to create a signer
 const signer = walletSource.connect(sourceProvider);
 
-const whaleERC20Address = '0xCa8e44C73cDCA309EA7615bC74fC1452BE9B3e49'; //ERC token address deployed on source
+const whaleERC20Address = '0x0702567B5FD4B823454dEEaDc7Eec8658b2AcB2F'; //ERC token address deployed on source
 const whaleERC20Contract = new ethers.Contract(whaleERC20Address, tokenABI, signer);
 
 
@@ -48,21 +48,22 @@ const whaleERC20Contract = new ethers.Contract(whaleERC20Address, tokenABI, sign
 const OFT_ABI = require('../artifacts/contracts/WhaleOFT.sol/WhaleOFT.json').abi;
 
 const destinationProvider = new ethers.providers.JsonRpcProvider(RPC_URL_DESTINATION);
-const walletDestination = ethers.Wallet.fromMnemonic(MNEMONIC).connect(destinationProvider);
+const walletDestination = new ethers.Wallet(PRIVATE_KEY).connect(destinationProvider);
 
-const destinationOftAddress = '0x57827B96CE8f99eed1925c2DfEfb67186FB57915';
+
+ // TODO://Change this to the OFT contract address on the destination network
+const destinationOftAddress = '0x10456F0788Bfba7405C89451bE257b11b490975E';  
 
 const destinationOFTContract = new ethers.Contract(destinationOftAddress, OFT_ABI, walletDestination);
-
-const userAddress = "0x3b3d39D059C7C4F14C827E4f32793fe8f2F13F3C";
 
 
 /* -------------------------------- OFT Adapter (SOURCE: here: SEPOLIA)-------------------------------- */
 
 const ADAPTER_ABI = require('../artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json').abi;
-const walletAdapter = ethers.Wallet.fromMnemonic(MNEMONIC).connect(sourceProvider);
+const walletAdapter = new ethers.Wallet(PRIVATE_KEY).connect(sourceProvider);
 
-const sourceAdapterAddress = '0x13baE193504AEc9Cb0103d500417ED80058939d4';
+// TODO://
+const sourceAdapterAddress = '0xbB35A07481cC10382D486D97EcB7F878Dfba092e';
 
 const sourceAdapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
 
@@ -109,7 +110,7 @@ async function setEnforcedOptions() {
         console.log('Transaction confirmed in block:', receipt.blockNumber);
 
 
-        await estimateSendFees(DESTINATION_ENDPOINT_ID, "1000", false, optionsData);
+        await estimateSendFees(DESTINATION_ENDPOINT_ID, "200000000", false, optionsData);
     } catch (error) {
         console.error('Error setting enforced options:', error);
     }
@@ -201,7 +202,7 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
 
         console.log(`Estimated fees: ${ethers.utils.formatUnits(feeEstimate.nativeFee, "ether")} ETH, ${ethers.utils.formatUnits(feeEstimate.lzTokenFee, 18)} LZT`);
 
-        //await sendTokensToDestination(amountToSend, feeEstimate, encodedOptions);
+        await sendTokensToDestination(amountToSend, feeEstimate, encodedOptions);
 
     } catch (error) {
         console.error(`Error estimating fees: ${error}`);
@@ -211,81 +212,79 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
 
 // Uncommit this to send tokens.
 
-// async function sendTokensToDestination(amountToSend: any, msgFee: any, encodedOptions: any) {
-//     try {
-//         // Validate input parameters
-//         if (!amountToSend || parseFloat(amountToSend) <= 0) {
-//             throw new Error("Invalid or zero amount to send specified.");
-//         }
-//         if (!ethers.utils.isAddress(destinationOftAddress)) {
-//             throw new Error("Invalid OFT address specified.");
-//         }
+async function sendTokensToDestination(amountToSend: any, msgFee: any, encodedOptions: any) {
+    try {
+        // Validate input parameters
+        if (!amountToSend || parseFloat(amountToSend) <= 0) {
+            throw new Error("Invalid or zero amount to send specified.");
+        }
+        if (!ethers.utils.isAddress(destinationOftAddress)) {
+            throw new Error("Invalid OFT address specified.");
+        }
 
-//         // Parse the amount to the correct unit
-//         const approvalAmount = ethers.utils.parseUnits(amountToSend.toString(), 18);
+        // Parse the amount to the correct unit
+        const approvalAmount = ethers.utils.parseUnits(amountToSend.toString(), 18);
 
-//         // Prepare the send parameters
-//         const sendParam = {
-//             dstEid: DESTINATION_ENDPOINT_ID,
-//             to: ethers.utils.hexZeroPad(walletSource.address, 32),
-//             amountLD: approvalAmount,
-//             minAmountLD: approvalAmount,
-//             extraOptions: encodedOptions,
-//             composeMsg: ethers.utils.toUtf8Bytes(""),
-//             oftCmd: ethers.utils.toUtf8Bytes("")
-//         };
+        // Prepare the send parameters
+        const sendParam = {
+            dstEid: DESTINATION_ENDPOINT_ID,
+            to: ethers.utils.hexZeroPad(walletSource.address, 32),
+            amountLD: approvalAmount,
+            minAmountLD: approvalAmount,
+            extraOptions: encodedOptions,
+            composeMsg: ethers.utils.toUtf8Bytes(""),
+            oftCmd: ethers.utils.toUtf8Bytes("")
+        };
 
-//         const fee = {
-//             nativeFee: msgFee.nativeFee, // Assuming this contains only the nativeFee
-//             lzTokenFee: msgFee.lzTokenFee // Assuming this contains the LZ token fee
-//         };
+        const fee = {
+            nativeFee: msgFee.nativeFee, // Assuming this contains only the nativeFee
+            lzTokenFee: msgFee.lzTokenFee // Assuming this contains the LZ token fee
+        };
 
-//         const adapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
+        const adapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
 
-//         console.log(sendParam);
-//         console.log(msgFee);
+        console.log(sendParam);
+        console.log(msgFee);
 
 
-//         const refundAddress = walletSource.address; // Assuming refund should go to the sender's wallet address
+        const refundAddress = walletSource.address; // Assuming refund should go to the sender's wallet address
 
-//                 // Get and print the user's balance before sending tokens
-//                 const balanceBefore = await signer.getBalance();
-//                 console.log(`Balance before transaction: ${ethers.utils.formatEther(balanceBefore)} ETH`);
+                // Get and print the user's balance before sending tokens
+                const balanceBefore = await signer.getBalance();
+                console.log(`Balance before transaction: ${ethers.utils.formatEther(balanceBefore)} ETH`);
         
-//         // Sending tokens, passing msgFee as transaction options
+        // Sending tokens, passing msgFee as transaction options
 
-//         const txResponse = await adapterContract.send(
-//             sendParam,
-//             fee,
-//             refundAddress, // Pass the refund address
-//             {
-//                 value: msgFee.nativeFee, // Ensure to pass the payable amount if required
-//                 gasLimit: 2300000,
-//                 gasPrice: ethers.utils.parseUnits("17", "gwei")
-//             }
-//         );
+        const txResponse = await adapterContract.send(
+            sendParam,
+            fee,
+            refundAddress, // Pass the refund address
+            {
+                value: msgFee.nativeFee, // Ensure to pass the payable amount if required                
+            }
+        );
 
 
-//         console.log(`Transaction Hash: ${txResponse.hash}`);
+        console.log(`Transaction Hash: ${txResponse.hash}`);
 
-//         // Wait for the transaction to be mined
-//         const receipt = await txResponse.wait();
-//         console.log(`    confirmed in block: ${receipt.blockNumber}`);
-
-
-//         // Get and print the user's balance after sending tokens
-//         const balanceAfter = await signer.getBalance();
-//         console.log(`Balance after transaction: ${ethers.utils.formatEther(balanceAfter)} ETH`);
+        // Wait for the transaction to be mined
+        const receipt = await txResponse.wait();
+        console.log(`    confirmed in block: ${receipt.blockNumber}`);
 
 
-//         return receipt; // Returning the receipt might be useful for further processing
+        // Get and print the user's balance after sending tokens
+        const balanceAfter = await signer.getBalance();
+        console.log(`Balance after transaction: ${ethers.utils.formatEther(balanceAfter)} ETH`);
 
-//     } catch (error) {
-//         // Log detailed error message and rethrow or handle appropriately
-//         console.error('Failed to send tokens:', error);
-//         throw error; // Rethrowing the error is useful if you want calling functions to handle it
-//     }
-// }
+
+        return receipt; // Returning the receipt might be useful for further processing
+
+    } catch (error) {
+        // Log detailed error message and rethrow or handle appropriately
+        console.error('Failed to send tokens:', error);
+        throw error; // Rethrowing the error is useful if you want calling functions to handle it
+    }
+}
 
 
 

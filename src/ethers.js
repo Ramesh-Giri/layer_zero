@@ -8,36 +8,37 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const tokenABI = require('./abi/WhaleTokens.json');
 // Load environment variables from .env file
 dotenv_1.default.config();
-const MNEMONIC = process.env.MNEMONIC;
-const RPC_URL_SOURCE = 'https://sepolia.base.org';
-const RPC_URL_DESTINATION = 'https://sepolia.infura.io/v3/6ae62b79ee1341898f1ac24796ada458';
-if (!MNEMONIC) {
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const RPC_URL_SOURCE = 'https://mainnet.base.org';
+const RPC_URL_DESTINATION = 'https://mainnet.infura.io/v3/6ae62b79ee1341898f1ac24796ada458';
+if (!PRIVATE_KEY) {
     console.error('MNEMONIC not found in environment variables');
     process.exit(1);
 }
-const SOURCE_ENDPOINT_ID = '40245'; // here base 
-const DESTINATION_ENDPOINT_ID = '40161'; // here sepolia 
+const SOURCE_ENDPOINT_ID = '30184'; // here base 
+const DESTINATION_ENDPOINT_ID = '30101'; // here eth 
 /* -------------------------------- ERC 20 contract ( SOURCE:  here: BASE_ SEP)-------------------------------- */
 // Using Sepolia network's Infura endpoint
 const sourceProvider = new ethers_1.ethers.providers.JsonRpcProvider(RPC_URL_SOURCE);
 // Connect to the Ethereum network
 // Create a wallet from the mnemonic
-const walletSource = ethers_1.ethers.Wallet.fromMnemonic(MNEMONIC);
+const walletSource = new ethers_1.ethers.Wallet(PRIVATE_KEY);
 // Connect the wallet to the provider to create a signer
 const signer = walletSource.connect(sourceProvider);
-const whaleERC20Address = '0xCa8e44C73cDCA309EA7615bC74fC1452BE9B3e49'; //ERC token address deployed on source
+const whaleERC20Address = '0x0702567B5FD4B823454dEEaDc7Eec8658b2AcB2F'; //ERC token address deployed on source
 const whaleERC20Contract = new ethers_1.ethers.Contract(whaleERC20Address, tokenABI, signer);
 /* -------------------------------- OFT on Base (destination: here: Sepolia) -------------------------------- */
 const OFT_ABI = require('../artifacts/contracts/WhaleOFT.sol/WhaleOFT.json').abi;
 const destinationProvider = new ethers_1.ethers.providers.JsonRpcProvider(RPC_URL_DESTINATION);
-const walletDestination = ethers_1.ethers.Wallet.fromMnemonic(MNEMONIC).connect(destinationProvider);
-const destinationOftAddress = '0x57827B96CE8f99eed1925c2DfEfb67186FB57915';
+const walletDestination = new ethers_1.ethers.Wallet(PRIVATE_KEY).connect(destinationProvider);
+// TODO://Change this to the OFT contract address on the destination network
+const destinationOftAddress = '0x10456F0788Bfba7405C89451bE257b11b490975E';
 const destinationOFTContract = new ethers_1.ethers.Contract(destinationOftAddress, OFT_ABI, walletDestination);
-const userAddress = "0x3b3d39D059C7C4F14C827E4f32793fe8f2F13F3C";
 /* -------------------------------- OFT Adapter (SOURCE: here: SEPOLIA)-------------------------------- */
 const ADAPTER_ABI = require('../artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json').abi;
-const walletAdapter = ethers_1.ethers.Wallet.fromMnemonic(MNEMONIC).connect(sourceProvider);
-const sourceAdapterAddress = '0x13baE193504AEc9Cb0103d500417ED80058939d4';
+const walletAdapter = new ethers_1.ethers.Wallet(PRIVATE_KEY).connect(sourceProvider);
+// TODO://
+const sourceAdapterAddress = '0xbB35A07481cC10382D486D97EcB7F878Dfba092e';
 const sourceAdapterContract = new ethers_1.ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
 // Function to Set Enforced Options
 // Function to Set Enforced Options
@@ -48,100 +49,94 @@ async function setEnforcedOptions() {
         .addExecutorLzReceiveOption(1000000, 1);
     // Encode options to hex string
     const optionsData = _options.toHex();
-    console.log('Enforced options:', optionsData);
-    // Display structured data of options
-    console.log('Options Data:', JSON.stringify({ gasLimit: 1000000, msgValue: 1 }, null, 2));
-    console.log('Fetching the enforced options:');
-    const enforcedOptions = [
-        {
-            eid: DESTINATION_ENDPOINT_ID,
-            msgType: 1,
-            options: optionsData
-        }
-    ];
     try {
         const nonce = await sourceProvider.getTransactionCount(walletSource.address, 'latest'); // Get the current nonce
         console.log('Sending transaction with nonce:', nonce);
-        const txResponse = await sourceAdapterContract.setEnforcedOptions(enforcedOptions, {
-            gasLimit: 1000000, // Adjusted gas limit if needed
-            gasPrice: ethers_1.ethers.utils.parseUnits("23", "gwei"), // Adjust gas price if needed
-            nonce: nonce // Explicitly set the nonce
+        const _sendParam = {
+            dstEid: DESTINATION_ENDPOINT_ID,
+            to: ethers_1.ethers.utils.hexZeroPad(walletSource.address, 32),
+            amountLD: ethers_1.ethers.utils.parseUnits("200000000", 18),
+            minAmountLD: ethers_1.ethers.utils.parseUnits("200000000", 18),
+            extraOptions: optionsData,
+            composeMsg: ethers_1.ethers.utils.toUtf8Bytes(""),
+            oftCmd: ethers_1.ethers.utils.toUtf8Bytes(""),
+        };
+        //await estimateSendFees(DESTINATION_ENDPOINT_ID, "200000000", false, optionsData);
+        const adapterContract = new ethers_1.ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
+        const feeEstimate = await adapterContract.quoteSend(_sendParam, false);
+        // Set a manual gas limit
+        const gasLimit = 65000; // Adjust this value as needed
+        await sendTokensToDestination(200000000, feeEstimate, optionsData, {
+            gasLimit: gasLimit
         });
-        console.log('Transaction response:', txResponse);
-        console.log('Waiting for transaction to be mined...');
-        const receipt = await txResponse.wait();
-        console.log('Transaction confirmed in block:', receipt.blockNumber);
-        await estimateSendFees(DESTINATION_ENDPOINT_ID, "1000", false, optionsData);
     }
     catch (error) {
         console.error('Error setting enforced options:', error);
     }
 }
-// Assume this function is part of your setup process and is called when necessary
-async function setPeerContracts() {
-    try {
-        const destinationOFTBytes32 = ethers_1.ethers.utils.hexZeroPad(destinationOftAddress, 32);
-        const sourceAdapterBytes32 = ethers_1.ethers.utils.hexZeroPad(sourceAdapterAddress, 32);
-        const isAdapterPeerOfOFT = await destinationOFTContract.isPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32); //  SOURCE endpint id
-        const isOFTPeerOfAdapter = await sourceAdapterContract.isPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32); //  DESTINATION endpoint id
-        if (!isAdapterPeerOfOFT || !isOFTPeerOfAdapter) {
-            console.log("Pairing...");
-            console.log("Pending hereee");
-            const txAdapter = await sourceAdapterContract.setPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
-            console.log("Pending hereee");
-            await txAdapter.wait();
-            console.log("Peered OFT to Adapter");
-            const tx = await destinationOFTContract.setPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32);
-            await tx.wait();
-            console.log("Peered Adapter to OFT");
-            console.log(`Adapter to OFT peer status: ${isAdapterPeerOfOFT}`);
-            console.log(`OFT to Adapter peer status: ${isOFTPeerOfAdapter}`);
-        }
-        else {
-            console.log("Already paired");
-        }
-    }
-    catch (error) {
-        console.error("An error occurred:", error);
-    }
-}
-async function estimateSendFees(dstEid, amountToSend, isBase, encodedOptions) {
-    const currentBalance = await whaleERC20Contract.balanceOf(walletSource.address);
-    console.log(`Current token balance: ${ethers_1.ethers.utils.formatUnits(currentBalance, 18)}`);
-    // Parse the amount to the correct unit
-    const approvalAmount = ethers_1.ethers.utils.parseUnits(amountToSend.toString(), 18);
-    console.log(`Attempting to approve ${ethers_1.ethers.utils.formatUnits(approvalAmount, 18)} tokens`);
-    // Approve the OFT contract to move your tokens on both networks
-    const approveTx = await whaleERC20Contract.approve(sourceAdapterAddress, approvalAmount);
-    await approveTx.wait(); // Wait for the first approval to complete
-    console.log(`Approval transaction hash: ${approveTx.hash}`);
-    const _sendParam = {
-        dstEid: dstEid,
-        to: ethers_1.ethers.utils.hexZeroPad(walletSource.address, 32),
-        amountLD: ethers_1.ethers.utils.parseUnits(amountToSend, 18),
-        minAmountLD: ethers_1.ethers.utils.parseUnits(amountToSend, 18),
-        extraOptions: encodedOptions,
-        composeMsg: ethers_1.ethers.utils.toUtf8Bytes(""),
-        oftCmd: ethers_1.ethers.utils.toUtf8Bytes("")
-    };
-    console.log(`Encoded Options being used: ${encodedOptions}`);
-    try {
-        const adapterContract = new ethers_1.ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
-        if (!ethers_1.ethers.utils.isAddress(destinationOftAddress)) {
-            throw new Error("Invalid OFT address");
-        }
-        if (!approvalAmount.gt(0)) {
-            throw new Error("Amount to send must be greater than zero");
-        }
-        const feeEstimate = await adapterContract.quoteSend(_sendParam, false);
-        console.log(`Estimated fees: ${ethers_1.ethers.utils.formatUnits(feeEstimate.nativeFee, "ether")} ETH, ${ethers_1.ethers.utils.formatUnits(feeEstimate.lzTokenFee, 18)} LZT`);
-        await sendTokensToDestination(amountToSend, feeEstimate, encodedOptions);
-    }
-    catch (error) {
-        console.error(`Error estimating fees: ${error}`);
-    }
-}
-async function sendTokensToDestination(amountToSend, msgFee, encodedOptions) {
+// // Assume this function is part of your setup process and is called when necessary
+// async function setPeerContracts() {
+//     try {
+//         const destinationOFTBytes32 = ethers.utils.hexZeroPad(destinationOftAddress, 32);
+//         const sourceAdapterBytes32 = ethers.utils.hexZeroPad(sourceAdapterAddress, 32);
+//         const isAdapterPeerOfOFT = await destinationOFTContract.isPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32); //  SOURCE endpint id
+//         const isOFTPeerOfAdapter = await sourceAdapterContract.isPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32); //  DESTINATION endpoint id
+//         //if (!isAdapterPeerOfOFT || !isOFTPeerOfAdapter) {
+//             console.log("Pairing...");
+//             console.log("Pending hereee");
+//             const txAdapter = await sourceAdapterContract.setPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
+//             console.log("Pending hereee");
+//             await txAdapter.wait();
+//             console.log("Peered OFT to Adapter");
+//             const tx = await destinationOFTContract.setPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32);
+//             await tx.wait();
+//             console.log("Peered Adapter to OFT");
+//             console.log(`Adapter to OFT peer status: ${isAdapterPeerOfOFT}`);
+//             console.log(`OFT to Adapter peer status: ${isOFTPeerOfAdapter}`);
+//         // }else{
+//         //     console.log("Already paired");
+//         // }
+//     } catch (error) {
+//         console.error("An error occurred:", error);
+//     }
+// }
+// async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boolean, encodedOptions: any) {
+//     const currentBalance = await whaleERC20Contract.balanceOf(walletSource.address);
+//     console.log(`Current token balance: ${ethers.utils.formatUnits(currentBalance, 18)}`);
+//     // Parse the amount to the correct unit
+//     const approvalAmount = ethers.utils.parseUnits(amountToSend.toString(), 18);
+//     console.log(`Attempting to approve ${ethers.utils.formatUnits(approvalAmount, 18)} tokens`);
+//     // Approve the OFT contract to move your tokens on both networks
+//     const approveTx = await whaleERC20Contract.approve(sourceAdapterAddress, approvalAmount);
+//     await approveTx.wait(); // Wait for the first approval to complete
+//     console.log(`Approval transaction hash: ${approveTx.hash}`);
+//     const _sendParam = {
+//         dstEid: dstEid,
+//         to: ethers.utils.hexZeroPad(walletSource.address, 32),
+//         amountLD: ethers.utils.parseUnits(amountToSend, 18),
+//         minAmountLD: ethers.utils.parseUnits(amountToSend, 18),
+//         extraOptions: encodedOptions,
+//         composeMsg: ethers.utils.toUtf8Bytes(""),
+//         oftCmd: ethers.utils.toUtf8Bytes("")
+//     };
+//     console.log(`Encoded Options being used: ${encodedOptions}`);
+//     try {
+//         const adapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
+//         if (!ethers.utils.isAddress(destinationOftAddress)) {
+//             throw new Error("Invalid OFT address");
+//         }
+//         if (!approvalAmount.gt(0)) {
+//             throw new Error("Amount to send must be greater than zero");
+//         }
+//         const feeEstimate = await adapterContract.quoteSend(_sendParam, false);
+//         console.log(`Estimated fees: ${ethers.utils.formatUnits(feeEstimate.nativeFee, "ether")} ETH, ${ethers.utils.formatUnits(feeEstimate.lzTokenFee, 18)} LZT`);
+//         await sendTokensToDestination(amountToSend, feeEstimate, encodedOptions);
+//     } catch (error) {
+//         console.error(`Error estimating fees: ${error}`);
+//     }
+// }
+// Uncommit this to send tokens.
+async function sendTokensToDestination(amountToSend, msgFee, encodedOptions, txOptions) {
     try {
         // Validate input parameters
         if (!amountToSend || parseFloat(amountToSend) <= 0) {
@@ -160,7 +155,8 @@ async function sendTokensToDestination(amountToSend, msgFee, encodedOptions) {
             minAmountLD: approvalAmount,
             extraOptions: encodedOptions,
             composeMsg: ethers_1.ethers.utils.toUtf8Bytes(""),
-            oftCmd: ethers_1.ethers.utils.toUtf8Bytes("")
+            oftCmd: ethers_1.ethers.utils.toUtf8Bytes(""),
+            ...txOptions // Include the transaction options, such as gas limit
         };
         const fee = {
             nativeFee: msgFee.nativeFee, // Assuming this contains only the nativeFee
@@ -176,9 +172,8 @@ async function sendTokensToDestination(amountToSend, msgFee, encodedOptions) {
         // Sending tokens, passing msgFee as transaction options
         const txResponse = await adapterContract.send(sendParam, fee, refundAddress, // Pass the refund address
         {
-            value: msgFee.nativeFee, // Ensure to pass the payable amount if required
-            gasLimit: 2300000,
-            gasPrice: ethers_1.ethers.utils.parseUnits("17", "gwei")
+            ...txOptions, // Ensure to pass the txOptions including gas limit
+            value: msgFee.nativeFee, // Ensure to pass the payable amount if required                
         });
         console.log(`Transaction Hash: ${txResponse.hash}`);
         // Wait for the transaction to be mined
@@ -228,7 +223,6 @@ async function sendTokensToDestination(amountToSend, msgFee, encodedOptions) {
 // }
 (async () => {
     try {
-        await setPeerContracts();
         await setEnforcedOptions();
         // Estimate send fees
         // await createEthereumWallet();

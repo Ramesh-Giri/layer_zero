@@ -41,18 +41,18 @@ const config = {
         ],
     },
     networks: {
-        sepolia: {
+        ethereum: {
             // the LayerZero Endpoint ID
-            eid: lz_definitions_1.EndpointId.SEPOLIA_V2_TESTNET,
+            eid: lz_definitions_1.EndpointId.ETHEREUM_V2_MAINNET,
             gas: "auto", // You can set this to a specific limit if necessary
             gasPrice: "auto", // You can set this to a specific price if necessary          
-            url: 'https://rpc2.sepolia.org',
+            url: 'https://mainnet.infura.io/v3/6ae62b79ee1341898f1ac24796ada458',
             accounts,
         },
-        base_test: {
+        base: {
             // the LayerZero Endpoint ID
-            eid: lz_definitions_1.EndpointId.BASESEP_V2_TESTNET,
-            url: 'https://sepolia.base.org',
+            eid: lz_definitions_1.EndpointId.BASE_MAINNET,
+            url: 'https://mainnet.base.org',
             accounts,
         },
     },

@@ -2,13 +2,13 @@ import { EndpointId } from '@layerzerolabs/lz-definitions'
 
 import type { OAppOmniGraphHardhat, OmniPointHardhat } from '@layerzerolabs/toolbox-hardhat'
 
-const sepoliaContract: OmniPointHardhat = {
-    eid: EndpointId.SEPOLIA_V2_TESTNET,
+const EthereumContract: OmniPointHardhat = {
+    eid: EndpointId.ETHEREUM_V2_MAINNET,
     contractName: 'WhaleOFT'
 }
 
-const baseTestContract: OmniPointHardhat = {
-    eid: EndpointId.BASESEP_V2_TESTNET,
+const BaseContract: OmniPointHardhat = {
+    eid: EndpointId.BASE_MAINNET,
     contractName: 'WhaleOFT'
 }
 
@@ -16,22 +16,22 @@ const baseTestContract: OmniPointHardhat = {
 const config: OAppOmniGraphHardhat = {
     contracts: [
         {
-            contract: sepoliaContract,
+            contract: EthereumContract,
         },
         
          {
-            contract: baseTestContract,
+            contract: BaseContract,
         }
     ],
     connections: [
 
         {
-            from: sepoliaContract,
-            to: baseTestContract,
+            from: EthereumContract,
+            to: BaseContract,
         },
         {
-            from: baseTestContract,
-            to: sepoliaContract,
+            from: BaseContract,
+            to: EthereumContract,
         }
     ],
 }

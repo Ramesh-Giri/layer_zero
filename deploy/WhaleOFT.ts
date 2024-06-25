@@ -22,19 +22,45 @@
 
 //     const endpointV2Deployment = await hre.deployments.get('EndpointV2')
 
-      
-//     const { address } = await deploy(contractName, {
+//     const deployArguments = [
+//         'WhaleArmy', // name
+//         'WHALE', // symbol
+//         endpointV2Deployment.address, // LayerZero's EndpointV2 address
+//         deployer, // owner
+//     ]
+
+//     const deploymentOptions = {
 //         from: deployer,
-//         args: [
-//             'WhaleArmy', // name
-//             'WHALE', // symbol
-//             endpointV2Deployment.address, // LayerZero's EndpointV2 address
-//             deployer, // owner
-//         ],
+//         args: deployArguments,
 //         log: true,
 //         skipIfAlreadyDeployed: false,
-//     })
+    
+//     }
 
+//     // Get contract artifact
+//     const artifact = await deployments.getArtifact(contractName)
+
+//     // Estimate gas required for deployment
+//     const factory = new ethers.ContractFactory(artifact.abi, artifact.bytecode, ethers.provider.getSigner(deployer))
+//     const deployTransaction = factory.getDeployTransaction(...deployArguments)
+
+
+//     const estimatedGas = await ethers.provider.estimateGas({
+//         ...deployTransaction,
+//         from: deployer
+//     });
+
+
+//     // Get current gas price
+//     const gasPrice = await ethers.provider.getGasPrice()
+
+//     // Calculate estimated deployment cost
+//     const estimatedDeploymentCost = estimatedGas.mul(gasPrice)
+    
+//     console.log(`Estimated deployment cost: ${ethers.utils.formatEther(estimatedDeploymentCost)} ETH`)
+
+//     const { address } = await deploy(contractName, deploymentOptions)
+      
 //     console.log(`Deployed contract: ${contractName}, network: ${hre.network.name}, address: ${address}`)
 // }
 
@@ -44,54 +70,54 @@
 
 
 
-// import assert from 'assert'
+import assert from 'assert'
 
-// import { type DeployFunction } from 'hardhat-deploy/types'
+import { type DeployFunction } from 'hardhat-deploy/types'
 
-// const contractName = 'WhaleAdapter'
+const contractName = 'WhaleAdapter'
 
-// const deploy: DeployFunction = async (hre) => {
-//     const { getNamedAccounts, deployments,ethers } = hre
+const deploy: DeployFunction = async (hre) => {
+    const { getNamedAccounts, deployments,ethers } = hre
 
-//     const { deploy } = deployments
-//     const { deployer } = await getNamedAccounts()
+    const { deploy } = deployments
+    const { deployer } = await getNamedAccounts()
 
-//     assert(deployer, 'Missing named deployer account')
+    assert(deployer, 'Missing named deployer account')
 
-//     const tokenAdress = '0xCa8e44C73cDCA309EA7615bC74fC1452BE9B3e49';
-//     console.log(`Network: ${hre.network.name}`)
-//     console.log(`Deployer: ${deployer}`)
-
-
-//         // Check deployer balance
-//     const balance = await ethers.provider.getBalance(deployer);
-//     console.log(`Deployer balance: ${ethers.utils.formatEther(balance)} ETH`);
-
-//     const endpointV2Deployment = await hre.deployments.get('EndpointV2')
+    const tokenAdress = '0x0702567B5FD4B823454dEEaDc7Eec8658b2AcB2F';
+    console.log(`Network: ${hre.network.name}`)
+    console.log(`Deployer: ${deployer}`)
 
 
-//     const { address } = await deploy(contractName, {
-//         from: deployer,
-//         args: [
-//             tokenAdress,            
-//             endpointV2Deployment.address, // LayerZero's EndpointV2 address
-//             deployer, // owner
-//         ],
-//         log: true,
-//         skipIfAlreadyDeployed: false,
-//     })
+        // Check deployer balance
+    const balance = await ethers.provider.getBalance(deployer);
+    console.log(`Deployer balance: ${ethers.utils.formatEther(balance)} ETH`);
 
-//     console.log(`Deployed Adapter: ${contractName}, network: ${hre.network.name}, address: ${address}`)
-// }
-
-// deploy.tags = [contractName]
-
-// export default deploy
+    const endpointV2Deployment = await hre.deployments.get('EndpointV2')
 
 
+    const { address } = await deploy(contractName, {
+        from: deployer,
+        args: [
+            tokenAdress,            
+            endpointV2Deployment.address, // LayerZero's EndpointV2 address
+            deployer, // owner
+        ],
+        log: true,
+        skipIfAlreadyDeployed: false,
+    })
 
-// whale TOken on Base sepolia : 0xCa8e44C73cDCA309EA7615bC74fC1452BE9B3e49 -- MAIN token address on Source (Base Sepolia)
+    console.log(`Deployed Adapter: ${contractName}, network: ${hre.network.name}, address: ${address}`)
+}
 
-// Wale Adapter of Base Sepolia : 0x13baE193504AEc9Cb0103d500417ED80058939d4 -- Adapter deployed on source (Base Sepolia)
+deploy.tags = [contractName]
 
-//Whale OFT of Sepolia : 0x57827B96CE8f99eed1925c2DfEfb67186FB57915 -- OFT deployed on destination ( Sepolia)
+export default deploy
+
+
+
+// whale TOken on Base  : 0x0702567B5FD4B823454dEEaDc7Eec8658b2AcB2F -- MAIN token address on Source (Base )
+
+// Wale Adapter of Base :    -- Adapter deployed on source (Base)
+
+// Whale OFT on Ethereum: 0x10456F0788Bfba7405C89451bE257b11b490975E -- OFT deployed on destination ( Ethereum)
