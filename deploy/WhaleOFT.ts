@@ -34,6 +34,8 @@
 //         args: deployArguments,
 //         log: true,
 //         skipIfAlreadyDeployed: false,
+//         gasLimit: 10000000, // Adjust the gas limit as needed
+
     
 //     }
 
@@ -70,54 +72,57 @@
 
 
 
-import assert from 'assert'
+// // import assert from 'assert'
 
-import { type DeployFunction } from 'hardhat-deploy/types'
+// // import { type DeployFunction } from 'hardhat-deploy/types'
 
-const contractName = 'WhaleAdapter'
+// // const contractName = 'WhaleAdapter'
 
-const deploy: DeployFunction = async (hre) => {
-    const { getNamedAccounts, deployments,ethers } = hre
+// // const deploy: DeployFunction = async (hre) => {
+// //     const { getNamedAccounts, deployments,ethers } = hre
 
-    const { deploy } = deployments
-    const { deployer } = await getNamedAccounts()
+// //     const { deploy } = deployments
+// //     const { deployer } = await getNamedAccounts()
 
-    assert(deployer, 'Missing named deployer account')
+// //     assert(deployer, 'Missing named deployer account')
 
-    const tokenAdress = '0x0702567B5FD4B823454dEEaDc7Eec8658b2AcB2F';
-    console.log(`Network: ${hre.network.name}`)
-    console.log(`Deployer: ${deployer}`)
-
-
-        // Check deployer balance
-    const balance = await ethers.provider.getBalance(deployer);
-    console.log(`Deployer balance: ${ethers.utils.formatEther(balance)} ETH`);
-
-    const endpointV2Deployment = await hre.deployments.get('EndpointV2')
+// //     const tokenAdress = '0x0702567B5FD4B823454dEEaDc7Eec8658b2AcB2F';
+// //     console.log(`Network: ${hre.network.name}`)
+// //     console.log(`Deployer: ${deployer}`)
 
 
-    const { address } = await deploy(contractName, {
-        from: deployer,
-        args: [
-            tokenAdress,            
-            endpointV2Deployment.address, // LayerZero's EndpointV2 address
-            deployer, // owner
-        ],
-        log: true,
-        skipIfAlreadyDeployed: false,
-    })
+// //         // Check deployer balance
+// //     const balance = await ethers.provider.getBalance(deployer);
+// //     console.log(`Deployer balance: ${ethers.utils.formatEther(balance)} ETH`);
 
-    console.log(`Deployed Adapter: ${contractName}, network: ${hre.network.name}, address: ${address}`)
-}
-
-deploy.tags = [contractName]
-
-export default deploy
+// //     const endpointV2Deployment = await hre.deployments.get('EndpointV2')
 
 
+// //     const { address } = await deploy(contractName, {
+// //         from: deployer,
+// //         args: [
+// //             tokenAdress,            
+// //             endpointV2Deployment.address, // LayerZero's EndpointV2 address
+// //             deployer, // owner
+// //         ],
+// //         log: true,
+// //         skipIfAlreadyDeployed: false,
+// //     })
 
-// whale TOken on Base  : 0x0702567B5FD4B823454dEEaDc7Eec8658b2AcB2F -- MAIN token address on Source (Base )
+// //     console.log(`Deployed Adapter: ${contractName}, network: ${hre.network.name}, address: ${address}`)
+// // }
 
-// Wale Adapter of Base :    -- Adapter deployed on source (Base)
+// // deploy.tags = [contractName]
 
-// Whale OFT on Ethereum: 0x10456F0788Bfba7405C89451bE257b11b490975E -- OFT deployed on destination ( Ethereum)
+// // export default deploy
+
+
+
+// // whale TOken on Base  : 0x0702567B5FD4B823454dEEaDc7Eec8658b2AcB2F -- MAIN token address on Source (Base )
+
+// // Wale Adapter of Base :   0xbB35A07481cC10382D486D97EcB7F878Dfba092e -- Adapter deployed on source (Base)
+
+// // Whale OFT on Ethereum: 0x10456F0788Bfba7405C89451bE257b11b490975E -- OFT deployed on destination ( Ethereum)
+
+
+// //whale OFT on BSC: 0x7F73A8884Ed3E7bAd79F2f949a1E29F7c0f832Bf -- OFT deployed on destination ( BSC)

@@ -17,15 +17,17 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
 const RPC_URL_SOURCE = 'https://mainnet.base.org';
 const RPC_URL_DESTINATION = 'https://mainnet.infura.io/v3/6ae62b79ee1341898f1ac24796ada458';
+const RPC_URL_DESTINATION_BSC = 'https://bsc-dataseed.binance.org/';
 
 if (!PRIVATE_KEY) {
-    console.error('MNEMONIC not found in environment variables');
+    console.error('NO PRIVATE KEY  not found in environment variables');
     process.exit(1);
 }
 
 
 const SOURCE_ENDPOINT_ID = '30184';  // here base 
 const DESTINATION_ENDPOINT_ID = '30101';  // here eth 
+const DESTINATION_ENDPOINT_ID_BSC = '102';  // here BSC 
 
 
 /* -------------------------------- ERC 20 contract ( SOURCE:  here: BASE_ SEP)-------------------------------- */
@@ -44,17 +46,26 @@ const whaleERC20Address = '0x0702567B5FD4B823454dEEaDc7Eec8658b2AcB2F'; //ERC to
 const whaleERC20Contract = new ethers.Contract(whaleERC20Address, tokenABI, signer);
 
 
-/* -------------------------------- OFT on Base (destination: here: Sepolia) -------------------------------- */
+/* -------------------------------- OFT on Base () -------------------------------- */
 const OFT_ABI = require('../artifacts/contracts/WhaleOFT.sol/WhaleOFT.json').abi;
 
 const destinationProvider = new ethers.providers.JsonRpcProvider(RPC_URL_DESTINATION);
 const walletDestination = new ethers.Wallet(PRIVATE_KEY).connect(destinationProvider);
 
-
  // TODO://Change this to the OFT contract address on the destination network
-const destinationOftAddress = '0x10456F0788Bfba7405C89451bE257b11b490975E';  
+ const destinationOftAddress = '0x10456F0788Bfba7405C89451bE257b11b490975E';  
 
-const destinationOFTContract = new ethers.Contract(destinationOftAddress, OFT_ABI, walletDestination);
+ const destinationOFTContract = new ethers.Contract(destinationOftAddress, OFT_ABI, walletDestination);
+ 
+ 
+/* -------------------------------- OFT on BSC () -------------------------------- */
+const destinationProviderBSC = new ethers.providers.JsonRpcProvider(RPC_URL_DESTINATION_BSC);
+const walletDestinationBSC = new ethers.Wallet(PRIVATE_KEY).connect(destinationProviderBSC);
+
+const destinationBscAddress = '0x7F73A8884Ed3E7bAd79F2f949a1E29F7c0f832Bf';  
+
+const destinationBscContract = new ethers.Contract(destinationBscAddress, OFT_ABI, walletDestinationBSC);
+
 
 
 /* -------------------------------- OFT Adapter (SOURCE: here: SEPOLIA)-------------------------------- */
@@ -91,6 +102,11 @@ async function setEnforcedOptions() {
             eid: DESTINATION_ENDPOINT_ID,
             msgType: 1,
             options: optionsData
+        },
+        {
+            eid: DESTINATION_ENDPOINT_ID_BSC,
+            msgType: 1,
+            options: optionsData
         }
     ];
 
@@ -111,6 +127,8 @@ async function setEnforcedOptions() {
 
 
         await estimateSendFees(DESTINATION_ENDPOINT_ID, "200000000", false, optionsData);
+        await estimateSendFees(DESTINATION_ENDPOINT_ID_BSC, "200000000", false, optionsData);
+
     } catch (error) {
         console.error('Error setting enforced options:', error);
     }
@@ -121,9 +139,12 @@ async function setEnforcedOptions() {
 async function setPeerContracts() {
     try {
 
-        const destinationOFTBytes32 = ethers.utils.hexZeroPad(destinationOftAddress, 32);
         const sourceAdapterBytes32 = ethers.utils.hexZeroPad(sourceAdapterAddress, 32);
+        const destinationOFTBytes32 = ethers.utils.hexZeroPad(destinationOftAddress, 32);
+        const destinationBscOFTBytes32 = ethers.utils.hexZeroPad(destinationBscAddress, 32);
+        
 
+        // Check pairing status between source adapter and destination OFT (Ethereum)
 
         const isAdapterPeerOfOFT = await destinationOFTContract.isPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32); //  SOURCE endpint id
         const isOFTPeerOfAdapter = await sourceAdapterContract.isPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32); //  DESTINATION endpoint id
@@ -149,6 +170,84 @@ async function setPeerContracts() {
         }else{
             console.log("Already paired");
         }
+
+
+
+                // Adapter to BSC OFT and vice versa
+        try {
+            const isAdapterPeerOfBscOFT = await destinationBscContract.isPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32);
+            const isBscOFTPeerOfAdapter = await sourceAdapterContract.isPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32);
+
+            if (!isAdapterPeerOfBscOFT || !isBscOFTPeerOfAdapter) {
+                console.log("Pairing Adapter to BSC OFT and vice versa...");
+
+                if (!isAdapterPeerOfBscOFT) {
+                    console.log("Pairing Adapter to BSC OFT...");
+                    const txAdapterToBscOFT = await sourceAdapterContract.setPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32, {
+                        gasLimit: 3000000,
+                        maxPriorityFeePerGas: ethers.utils.parseUnits("1.0", "gwei"), // Adjust as needed
+                        maxFeePerGas: ethers.utils.parseUnits("23.0", "gwei") // Adjust as needed
+
+                    });
+                    await txAdapterToBscOFT.wait();
+                    console.log("Adapter to BSC OFT paired");
+                }
+
+                if (!isBscOFTPeerOfAdapter) {
+                    console.log("Pairing BSC OFT to Adapter...");
+                    const txBscOFTToAdapter = await destinationBscContract.setPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32, {
+                        gasLimit: 3000000,
+                        maxPriorityFeePerGas: ethers.utils.parseUnits("1.0", "gwei"), // Adjust as needed
+                        maxFeePerGas: ethers.utils.parseUnits("23.0", "gwei") // Adjust as needed
+
+                    });
+                    await txBscOFTToAdapter.wait();
+                    console.log("BSC OFT to Adapter paired");
+                }
+            }
+        } catch (error) {
+            console.error("An error occurred:", error);
+        }
+
+
+
+        try{
+         // Ethereum OFT to BSC OFT and vice versa
+        const isEthOFTPeerOfBscOFT = await destinationBscContract.isPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
+        const isBscOFTPeerOfEthOFT = await destinationOFTContract.isPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32);
+
+        if (!isEthOFTPeerOfBscOFT || !isBscOFTPeerOfEthOFT) {
+            console.log("Pairing Ethereum OFT to BSC OFT and vice versa...");
+
+            if (!isEthOFTPeerOfBscOFT) {
+                const txEthOFTToBscOFT = await destinationOFTContract.setPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32, {
+                    gasLimit: 3000000,
+                    maxPriorityFeePerGas: ethers.utils.parseUnits("2.0", "gwei"), // Adjust as needed
+                    maxFeePerGas: ethers.utils.parseUnits("100.0", "gwei") // Adjust as needed
+
+
+                 });
+                await txEthOFTToBscOFT.wait();
+                console.log("Ethereum OFT to BSC OFT paired");
+            }
+
+            if (!isBscOFTPeerOfEthOFT) {
+                const txBscOFTToEthOFT = await destinationBscContract.setPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32, {
+                    gasLimit: 3000000,
+                    maxPriorityFeePerGas: ethers.utils.parseUnits("2.0", "gwei"), // Adjust as needed
+                    maxFeePerGas: ethers.utils.parseUnits("100.0", "gwei") // Adjust as needed
+
+
+                 });
+                await txBscOFTToEthOFT.wait();
+                console.log("BSC OFT to Ethereum OFT paired");
+            }
+        }
+    } catch (error) {
+        console.error("An error occurred:", error);
+    }
+
+
 
     } catch (error) {
         console.error("An error occurred:", error);
@@ -202,7 +301,7 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
 
         console.log(`Estimated fees: ${ethers.utils.formatUnits(feeEstimate.nativeFee, "ether")} ETH, ${ethers.utils.formatUnits(feeEstimate.lzTokenFee, 18)} LZT`);
 
-        await sendTokensToDestination(amountToSend, feeEstimate, encodedOptions);
+        //await sendTokensToDestination(amountToSend, feeEstimate, encodedOptions);
 
     } catch (error) {
         console.error(`Error estimating fees: ${error}`);
@@ -212,79 +311,79 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
 
 // Uncommit this to send tokens.
 
-async function sendTokensToDestination(amountToSend: any, msgFee: any, encodedOptions: any) {
-    try {
-        // Validate input parameters
-        if (!amountToSend || parseFloat(amountToSend) <= 0) {
-            throw new Error("Invalid or zero amount to send specified.");
-        }
-        if (!ethers.utils.isAddress(destinationOftAddress)) {
-            throw new Error("Invalid OFT address specified.");
-        }
+// async function sendTokensToDestination(amountToSend: any, msgFee: any, encodedOptions: any) {
+//     try {
+//         // Validate input parameters
+//         if (!amountToSend || parseFloat(amountToSend) <= 0) {
+//             throw new Error("Invalid or zero amount to send specified.");
+//         }
+//         if (!ethers.utils.isAddress(destinationOftAddress)) {
+//             throw new Error("Invalid OFT address specified.");
+//         }
 
-        // Parse the amount to the correct unit
-        const approvalAmount = ethers.utils.parseUnits(amountToSend.toString(), 18);
+//         // Parse the amount to the correct unit
+//         const approvalAmount = ethers.utils.parseUnits(amountToSend.toString(), 18);
 
-        // Prepare the send parameters
-        const sendParam = {
-            dstEid: DESTINATION_ENDPOINT_ID,
-            to: ethers.utils.hexZeroPad(walletSource.address, 32),
-            amountLD: approvalAmount,
-            minAmountLD: approvalAmount,
-            extraOptions: encodedOptions,
-            composeMsg: ethers.utils.toUtf8Bytes(""),
-            oftCmd: ethers.utils.toUtf8Bytes("")
-        };
+//         // Prepare the send parameters
+//         const sendParam = {
+//             dstEid: DESTINATION_ENDPOINT_ID,
+//             to: ethers.utils.hexZeroPad(walletSource.address, 32),
+//             amountLD: approvalAmount,
+//             minAmountLD: approvalAmount,
+//             extraOptions: encodedOptions,
+//             composeMsg: ethers.utils.toUtf8Bytes(""),
+//             oftCmd: ethers.utils.toUtf8Bytes("")
+//         };
 
-        const fee = {
-            nativeFee: msgFee.nativeFee, // Assuming this contains only the nativeFee
-            lzTokenFee: msgFee.lzTokenFee // Assuming this contains the LZ token fee
-        };
+//         const fee = {
+//             nativeFee: msgFee.nativeFee, // Assuming this contains only the nativeFee
+//             lzTokenFee: msgFee.lzTokenFee // Assuming this contains the LZ token fee
+//         };
 
-        const adapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
+//         const adapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
 
-        console.log(sendParam);
-        console.log(msgFee);
+//         console.log(sendParam);
+//         console.log(msgFee);
 
 
-        const refundAddress = walletSource.address; // Assuming refund should go to the sender's wallet address
+//         const refundAddress = walletSource.address; // Assuming refund should go to the sender's wallet address
 
-                // Get and print the user's balance before sending tokens
-                const balanceBefore = await signer.getBalance();
-                console.log(`Balance before transaction: ${ethers.utils.formatEther(balanceBefore)} ETH`);
+//                 // Get and print the user's balance before sending tokens
+//                 const balanceBefore = await signer.getBalance();
+//                 console.log(`Balance before transaction: ${ethers.utils.formatEther(balanceBefore)} ETH`);
         
-        // Sending tokens, passing msgFee as transaction options
+//         // Sending tokens, passing msgFee as transaction options
 
-        const txResponse = await adapterContract.send(
-            sendParam,
-            fee,
-            refundAddress, // Pass the refund address
-            {
-                value: msgFee.nativeFee, // Ensure to pass the payable amount if required                
-            }
-        );
-
-
-        console.log(`Transaction Hash: ${txResponse.hash}`);
-
-        // Wait for the transaction to be mined
-        const receipt = await txResponse.wait();
-        console.log(`    confirmed in block: ${receipt.blockNumber}`);
+//         const txResponse = await adapterContract.send(
+//             sendParam,
+//             fee,
+//             refundAddress, // Pass the refund address
+//             {
+//                 value: msgFee.nativeFee, // Ensure to pass the payable amount if required                
+//             }
+//         );
 
 
-        // Get and print the user's balance after sending tokens
-        const balanceAfter = await signer.getBalance();
-        console.log(`Balance after transaction: ${ethers.utils.formatEther(balanceAfter)} ETH`);
+//         console.log(`Transaction Hash: ${txResponse.hash}`);
+
+//         // Wait for the transaction to be mined
+//         const receipt = await txResponse.wait();
+//         console.log(`    confirmed in block: ${receipt.blockNumber}`);
 
 
-        return receipt; // Returning the receipt might be useful for further processing
+//         // Get and print the user's balance after sending tokens
+//         const balanceAfter = await signer.getBalance();
+//         console.log(`Balance after transaction: ${ethers.utils.formatEther(balanceAfter)} ETH`);
 
-    } catch (error) {
-        // Log detailed error message and rethrow or handle appropriately
-        console.error('Failed to send tokens:', error);
-        throw error; // Rethrowing the error is useful if you want calling functions to handle it
-    }
-}
+
+//         return receipt; // Returning the receipt might be useful for further processing
+
+//     } catch (error) {
+//         // Log detailed error message and rethrow or handle appropriately
+//         console.error('Failed to send tokens:', error);
+//         throw error; // Rethrowing the error is useful if you want calling functions to handle it
+//     }
+// }
 
 
 
@@ -338,7 +437,7 @@ async function sendTokensToDestination(amountToSend: any, msgFee: any, encodedOp
 
          await setPeerContracts();
 
-        await setEnforcedOptions();
+      //  await setEnforcedOptions();
 
         // Estimate send fees
 

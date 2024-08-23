@@ -63,6 +63,12 @@ const config: HardhatUserConfig = {
             url: 'https://mainnet.base.org',
             accounts,
         },
+        bsc: {
+            // the LayerZero Endpoint ID
+            eid: EndpointId.BSC_MAINNET,
+            url: 'https://bsc-dataseed.binance.org/',
+            accounts,
+        },
     },
     namedAccounts: {
         deployer: {

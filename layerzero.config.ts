@@ -12,6 +12,11 @@ const BaseContract: OmniPointHardhat = {
     contractName: 'WhaleOFT'
 }
 
+const BscContract: OmniPointHardhat = {
+    eid: EndpointId.BSC_MAINNET,
+    contractName: 'WhaleOFT'
+}
+
 
 const config: OAppOmniGraphHardhat = {
     contracts: [
@@ -21,7 +26,11 @@ const config: OAppOmniGraphHardhat = {
         
          {
             contract: BaseContract,
-        }
+        },
+        
+        {
+           contract: BscContract,
+       }
     ],
     connections: [
 
@@ -32,6 +41,22 @@ const config: OAppOmniGraphHardhat = {
         {
             from: BaseContract,
             to: EthereumContract,
+        },
+        {
+            from: EthereumContract,
+            to: BscContract,
+        },
+        {
+            from: BscContract,
+            to: EthereumContract,
+        },
+        {
+            from: BaseContract,
+            to: BscContract,
+        },
+        {
+            from: BscContract,
+            to: BaseContract,
         }
     ],
 }

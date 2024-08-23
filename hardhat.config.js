@@ -55,6 +55,12 @@ const config = {
             url: 'https://mainnet.base.org',
             accounts,
         },
+        bsc: {
+            // the LayerZero Endpoint ID
+            eid: lz_definitions_1.EndpointId.BSC_MAINNET,
+            url: 'https://bsc-dataseed.binance.org/',
+            accounts,
+        },
     },
     namedAccounts: {
         deployer: {
