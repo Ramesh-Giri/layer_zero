@@ -6,7 +6,7 @@ import styles from './page.module.css';
 import { BrowserProvider, Contract, formatUnits } from 'ethers';
 import WalletConnectProvider from "@walletconnect/web3-provider";
 import networkConfig from '../../../src/config/networks'; // Replace with your network configuration
-import { setEnforcedOptions, sendTokensToDestination } from '../../../src/utils/functions'; // Replace with your actual function or logic
+import { setEnforcedOptions,estimateSendFees, sendTokensToDestination } from '../../../src/utils/functions'; // Replace with your actual function or logic
 
 declare global {
   interface Window {
@@ -122,73 +122,64 @@ export default function Home() {
     setAmount(tokenBalance);
   };
 
-
   const handleSwap = async () => {
     if (!provider || !walletAddress) {
       setError('No provider or wallet address available');
       return;
     }
-
+  
     if (!amount) {
       setError('Please enter an amount to swap');
       return;
     }
-
+  
     try {
       setError(''); // Clear any previous errors
-
+  
       const signerInstance = await provider.getSigner(); // Await to resolve JsonRpcSigner
-      const optionsData = await setEnforcedOptions(signerInstance);
+        //const optionsData = await setEnforcedOptions(signerInstance);
 
-      // Call the backend to estimate gas fees
-      const response = await fetch('/estimate-gas', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          endpointId: networkConfig.mainnet.ethereum.endpointId, // Replace with appropriate endpoint ID
-          amount: ethers.parseUnits(amount, 18).toString(), // Convert to appropriate units
-          isBaseNetwork: chainFrom === 'base',
-          optionsData, // Pass the generated optionsData
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(`Failed to estimate gas: ${data.error}`);
-      }
-
-      const data = await response.json();
-      console.log(`Estimated Gas: ${data.estimatedGas}`);
-
-       // Assuming the response contains both nativeFee and lzTokenFee
-    const msgFee = {
-      nativeFee: BigInt(data.estimatedGas.nativeFee), // Convert to BigInt if necessary
-      lzTokenFee: BigInt(data.estimatedGas.lzTokenFee), // Convert to BigInt if necessary
-    };
-
-
+      const Options = require('@layerzerolabs/lz-v2-utilities').Options;
+      const _options = Options.newOptions().addExecutorLzReceiveOption(1000000, 1);
+      const optionsData = _options.toHex();
+  
+      // Get estimated fees
+      const estimatedFees = await estimateSendFees(
+        networkConfig.mainnet.ethereum.endpointId, 
+        amount.toString(), 
+        chainFrom === 'base', 
+        optionsData, 
+        signerInstance
+      );
+      
+  
+      // Prepare the msgFee object using the estimated fees
+      const msgFee = {
+        nativeFee: BigInt(estimatedFees.nativeFee), // Convert to BigInt if necessary
+        lzTokenFee: BigInt(estimatedFees.lzTokenFee) // Convert to BigInt if necessary
+      };
+  
+      console.log('Seding to address :', tokenAddresses[chainTo]);
       // If gas estimation succeeds, proceed to send the tokens
       const receipt = await sendTokensToDestination({
-        amountToSend: amount,
+        amountToSend: amount.toString(),
         msgFee: msgFee,
         encodedOptions: optionsData,
         signer: signerInstance,
         destinationOftAddress: tokenAddresses[chainTo], // Use the appropriate token address
-        sourceAdapterAddress: networkConfig.mainnet.ethereum.adapterAddress, // Replace with your adapter address
+        sourceAdapterAddress: networkConfig.mainnet.base.adapterAddress, // Replace with your adapter address
         ADAPTER_ABI: require('../../../artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json').abi, // Use correct ABI
         DESTINATION_ENDPOINT_ID: networkConfig.mainnet.ethereum.endpointId, // Replace with appropriate endpoint ID
       });
-
-      console.log('Tokens sent successfully:', receipt);
-
+  
+     console.log('Tokens sent successfully:', receipt);
+  
     } catch (err) {
       setError('Failed to execute swap: ' + (err as Error).message);
       console.error('Swap execution error:', err);
     }
-};
-
+  };
+  
 
   return (
     <Layout>
