@@ -133,12 +133,17 @@ export default function Home() {
       setError('Please enter an amount to swap');
       return;
     }
+    const Options = require('@layerzerolabs/lz-v2-utilities').Options;
 
     try {
       setError(''); // Clear any previous errors
 
-      const signerInstance = await provider.getSigner(); // Await to resolve JsonRpcSigner
-      const optionsData = await setEnforcedOptions(signerInstance);
+      //const optionsData = await setEnforcedOptions(signerInstance);
+
+
+      const _options = await Options.newOptions().addExecutorLzReceiveOption(1000000, 1);
+      const optionsData = await _options.toHex();
+    
 
       // Call the backend to estimate gas fees
       const response = await fetch('/estimate-gas', {
@@ -148,27 +153,32 @@ export default function Home() {
         },
         body: JSON.stringify({
           endpointId: networkConfig.mainnet.ethereum.endpointId, // Replace with appropriate endpoint ID
-          amount: ethers.parseUnits(amount, 18).toString(), // Convert to appropriate units
+          amount: amount.toString(), // Convert to appropriate units
           isBaseNetwork: chainFrom === 'base',
           optionsData, // Pass the generated optionsData
+          walletProviderUrl: networkConfig.mainnet.base.rpcUrl, // Use the provider URL
+          
         }),
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(`Failed to estimate gas: ${data.error}`);
+        // Handle errors from the backend
+        console.error('Error from backend:', response.statusText);
+        throw new Error(`Request failed with status ${response.status}`);
       }
 
       const data = await response.json();
       console.log(`Estimated Gas: ${data.estimatedGas}`);
 
        // Assuming the response contains both nativeFee and lzTokenFee
-    const msgFee = {
-      nativeFee: BigInt(data.estimatedGas.nativeFee), // Convert to BigInt if necessary
-      lzTokenFee: BigInt(data.estimatedGas.lzTokenFee), // Convert to BigInt if necessary
-    };
+      const msgFee = {
+        nativeFee: BigInt(data.estimatedGas.nativeFee), // Convert to BigInt if necessary
+        lzTokenFee: BigInt(data.estimatedGas.lzTokenFee), // Convert to BigInt if necessary
+      };
 
+      const signerInstance = await provider.getSigner(); // Await to resolve JsonRpcSigner
 
+      
       // If gas estimation succeeds, proceed to send the tokens
       const receipt = await sendTokensToDestination({
         amountToSend: amount,
