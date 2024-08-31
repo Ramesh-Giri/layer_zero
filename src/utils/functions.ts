@@ -46,14 +46,12 @@ export async function setPeerContracts({ networks, signer }: PeerContractOptions
     }
 }
 
-
-
 export async function setEnforcedOptions(signer: ethers.Signer): Promise<string> {
   if (!signer || !signer.provider) {
     throw new Error("Invalid signer or provider. Please ensure the signer is connected.");
   }
-
   const Options = require('@layerzerolabs/lz-v2-utilities').Options;
+
   const _options = Options.newOptions().addExecutorLzReceiveOption(1000000, 1);
   const optionsData = _options.toHex();
 
@@ -62,7 +60,7 @@ export async function setEnforcedOptions(signer: ethers.Signer): Promise<string>
       eid: networkConfig.mainnet.ethereum.endpointId,
       msgType: 1,
       options: optionsData,
-    } 
+    }
   ];
 
   try {
@@ -75,22 +73,12 @@ export async function setEnforcedOptions(signer: ethers.Signer): Promise<string>
 
     const nonce = await signer.getNonce('latest');
 
-    // // Manually estimate gas by calling the provider's estimateGas function
-    // const estimatedGas = await signer.provider.estimateGas({
-    //   to: sourceNetwork.adapterAddress,
-    //   data: sourceAdapterContract.interface.encodeFunctionData('setEnforcedOptions', [enforcedOptions]),
-    //   gasLimit: 100000, // Set a gas limit if required
-    //   gasPrice: ethers.parseUnits("20", "gwei"), // Gas price in gwei
-    //   nonce: nonce
-    // });
-    // // Add a buffer to the estimated gas
-    // const gasLimitWithBuffer = estimatedGas + 10000n;
-
-    // Send the transaction with the estimated gas limit
+  
+    // Send the transaction with the estimated gas limit and gas price
     const txResponse = await sourceAdapterContract.setEnforcedOptions(enforcedOptions, {
-      gasLimit: 10000, // Use the calculated gas limit with buffer
-      gasPrice: ethers.parseUnits("20", "gwei"), // Ensure gasPrice is parsed correctly
-      nonce: BigInt(nonce),
+      gasLimit: 1000000, // Adjusted gas limit if needed
+      gasPrice: ethers.parseUnits("23", "gwei"), // Gas price in gwei
+      nonce: nonce,
     });
 
     const receipt = await txResponse.wait();
@@ -105,7 +93,7 @@ export async function setEnforcedOptions(signer: ethers.Signer): Promise<string>
 
 
 
-export async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boolean, encodedOptions: string, signer: ethers.Signer) {
+export async function estimateSendFees(dstEid: any, amountToSend: any, isBase: boolean, encodedOptions: string, signer: ethers.Signer) {
     const network = networkConfig.mainnet.base;
     const provider = signer.provider as ethers.JsonRpcProvider;
     const whaleERC20Contract = new ethers.Contract(
@@ -117,7 +105,7 @@ export async function estimateSendFees(dstEid: any, amountToSend: string, isBase
     const currentBalance = await whaleERC20Contract.balanceOf(await signer.getAddress());
     console.log(`Current token balance: ${ethers.formatUnits(currentBalance, 18)}`);
 
-    const approvalAmount = ethers.parseUnits(amountToSend, 18);
+    const approvalAmount = amountToSend;
     const approveTx = await whaleERC20Contract.approve(network.adapterAddress, approvalAmount);
     await approveTx.wait();
 

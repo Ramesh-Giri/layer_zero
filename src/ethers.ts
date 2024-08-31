@@ -59,7 +59,7 @@
  
  
 // /* -------------------------------- OFT on BSC () -------------------------------- */
-// const destinationProviderBSC = new ethers.JsonRpcProvider(RPC_URL_DESTINATION_BSC);
+// const destinationProviderBSC = new ethers.providers.JsonRpcProvider(RPC_URL_DESTINATION_BSC);
 // const walletDestinationBSC = new ethers.Wallet(PRIVATE_KEY).connect(destinationProviderBSC);
 
 // const destinationBscAddress = '0x7F73A8884Ed3E7bAd79F2f949a1E29F7c0f832Bf';  

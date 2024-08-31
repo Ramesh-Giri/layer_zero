@@ -4,8 +4,6 @@ import networkConfig from './config/networks';
 import express from 'express';
 import { setPeerContracts, setEnforcedOptions, estimateSendFees } from './utils/functions';
 
-// Load environment variables from .env file
-dotenv.config();
 
 function initializeNetworks(env: 'mainnet' | 'testnet', signer: ethers.Signer): any[] {
     const selectedConfig = networkConfig[env];
@@ -26,28 +24,34 @@ function initializeNetworks(env: 'mainnet' | 'testnet', signer: ethers.Signer): 
 
 // Set up Express
 const app = express();
+
+// Middleware to parse JSON bodies
 app.use(express.json());
 
+// Define the POST /estimate-gas route
 app.post('/estimate-gas', async (req, res) => {
-    const { endpointId, amount, isBaseNetwork, optionsData, walletProvider } = req.body;
+    const { endpointId, amount, isBaseNetwork, optionsData, walletProviderUrl } = req.body;
 
     try {
-        const provider = new ethers.BrowserProvider(walletProvider);
-        const signer = await provider.getSigner(); // Await here to get the resolved JsonRpcSigner
+        // Initialize provider using the wallet provider URL
+        const provider = new ethers.JsonRpcProvider(walletProviderUrl);
+        const signer = await provider.getSigner(); // Obtain the signer
 
-        // Initialize networks and set peer contracts as needed
-        //const networks = initializeNetworks('mainnet', signer);
-        //await setPeerContracts({ networks, signer });
-
-        // Set enforced options for transactions and estimate gas
-    
-        const estimatedGas = await estimateSendFees(endpointId, amount, isBaseNetwork, optionsData, signer);
+        // Estimate gas
+        const parsedAmount = ethers.parseUnits(amount, 18);
+        const estimatedGas = await estimateSendFees(endpointId, parsedAmount, isBaseNetwork, optionsData, signer);
 
         res.json({ estimatedGas });
     } catch (error) {
         console.error(`Error estimating gas: ${error}`);
         res.status(500).json({ error: 'Failed to estimate gas' });
     }
+});
+
+// 404 handler - this should be after all other routes
+app.use((req, res, next) => {
+    console.log(`Request received for ${req.method} ${req.url}`);
+    res.status(404).send('Not Found');
 });
 
 const PORT = process.env.PORT || 3000;
