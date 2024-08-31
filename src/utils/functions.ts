@@ -105,44 +105,60 @@ export async function setEnforcedOptions(signer: ethers.Signer): Promise<string>
 
 
 
-export async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boolean, encodedOptions: string, signer: ethers.Signer) {
-    const network = networkConfig.mainnet.base;
-    const provider = signer.provider as ethers.JsonRpcProvider;
-    const whaleERC20Contract = new ethers.Contract(
-        network.oftAddress,
-        require('../abi/WhaleTokens.json'),
-        signer.connect(provider)
+export async function estimateSendFees(
+  dstEid: any, 
+  amountToSend: string, 
+  isBase: boolean, 
+  encodedOptions: string, 
+  signer: ethers.Signer
+) {
+  const network = networkConfig.mainnet.base;
+  const provider = signer.provider as ethers.JsonRpcProvider;
+  const whaleERC20Contract = new ethers.Contract(
+    network.oftAddress,
+    require('../abi/WhaleTokens.json'),
+    signer
+  );
+
+  const currentBalance = await whaleERC20Contract.balanceOf(await signer.getAddress());
+  console.log(`Current token balance: ${ethers.formatUnits(currentBalance, 18)}`);
+
+
+  console.log(`Amount to send : ${amountToSend}`);
+
+  const approvalAmount = ethers.parseUnits(amountToSend, 18);
+  const approveTx = await whaleERC20Contract.approve(network.adapterAddress, approvalAmount);
+  await approveTx.wait();
+
+  const _sendParam = {
+    dstEid: dstEid,
+    to: ethers.zeroPadValue(await signer.getAddress(), 32),
+    amountLD: approvalAmount,
+    minAmountLD: approvalAmount,
+    extraOptions: encodedOptions,
+    composeMsg: ethers.toUtf8Bytes(""),
+    oftCmd: ethers.toUtf8Bytes("")
+  };
+
+  try {
+    const adapterContract = new ethers.Contract(
+      network.adapterAddress,
+      require(`../../../whale_token/artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json`).abi,
+      signer
     );
+    const feeEstimate = await adapterContract.quoteSend(_sendParam, false);
 
-    const currentBalance = await whaleERC20Contract.balanceOf(await signer.getAddress());
-    console.log(`Current token balance: ${ethers.formatUnits(currentBalance, 18)}`);
+    console.log(`Estimated fees: ${ethers.formatUnits(feeEstimate.nativeFee, "ether")} ETH, ${ethers.formatUnits(feeEstimate.lzTokenFee, 18)} LZT`);
 
-    const approvalAmount = ethers.parseUnits(amountToSend, 18);
-    const approveTx = await whaleERC20Contract.approve(network.adapterAddress, approvalAmount);
-    await approveTx.wait();
-
-    const _sendParam = {
-        dstEid: dstEid,
-        to: ethers.zeroPadValue(await signer.getAddress(), 32),
-        amountLD: approvalAmount,
-        minAmountLD: approvalAmount,
-        extraOptions: encodedOptions,
-        composeMsg: ethers.toUtf8Bytes(""),
-        oftCmd: ethers.toUtf8Bytes("")
+    // Return the fees to be used in the calling function
+    return {
+      nativeFee: feeEstimate.nativeFee,
+      lzTokenFee: feeEstimate.lzTokenFee
     };
-
-    try {
-        const adapterContract = new ethers.Contract(
-            network.adapterAddress,
-            require(`../../../whale_token/artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json`).abi,
-            signer.connect(provider)
-        );
-        const feeEstimate = await adapterContract.quoteSend(_sendParam, false);
-
-        console.log(`Estimated fees: ${ethers.formatUnits(feeEstimate.nativeFee, "ether")} ETH, ${ethers.formatUnits(feeEstimate.lzTokenFee, 18)} LZT`);
-    } catch (error) {
-        console.error(`Error estimating fees: ${error}`);
-    }
+  } catch (error) {
+    console.error(`Error estimating fees: ${error}`);
+    throw new Error('Failed to estimate fees');
+  }
 }
 
 
@@ -155,6 +171,7 @@ export async function sendTokensToDestination({
   sourceAdapterAddress,
   ADAPTER_ABI,
   DESTINATION_ENDPOINT_ID,
+  
 }: SendTokensParams): Promise<ethers.TransactionReceipt | void> {
   try {
     // Validate input parameters
@@ -166,7 +183,7 @@ export async function sendTokensToDestination({
     }
 
     // Parse the amount to the correct unit
-    const approvalAmount = ethers.parseUnits(amountToSend.toString(), 18);
+    const approvalAmount = ethers.parseUnits(amountToSend, 18);
 
     // Prepare the send parameters
     const sendParam = {
@@ -181,22 +198,6 @@ export async function sendTokensToDestination({
 
     const adapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, signer);
 
-    // Log the user's balance before sending tokens
-    const balanceBefore = await signer.provider?.getBalance(await signer.getAddress());
-    console.log(`Balance before transaction: ${ethers.formatUnits(balanceBefore!, "ether")} ETH`);
-    
-
-    // Estimate gas
-    const gasEstimate = await adapterContract.estimateGas.send(
-      sendParam,
-      msgFee,
-      await signer.getAddress(),
-      { value: msgFee.nativeFee }
-    );
-    console.log(`Estimated Gas: ${gasEstimate.toString()}`);
-
-    const gasLimitWithBuffer = BigInt(gasEstimate.toString()) + 10000n;
-
 
     // Sending tokens, passing msgFee as transaction options
     const txResponse = await adapterContract.send(
@@ -204,20 +205,13 @@ export async function sendTokensToDestination({
       msgFee,
       await signer.getAddress(),
       {
-        gasLimit: gasLimitWithBuffer, // Add buffer as BigInt
         value: msgFee.nativeFee, // Ensure to pass the payable amount if required                
       }
     );
 
-    console.log(`Transaction Hash: ${txResponse.hash}`);
-
     // Wait for the transaction to be mined
     const receipt = await txResponse.wait();
-    console.log(`Transaction confirmed in block: ${receipt.blockNumber}`);
 
-    // Log the user's balance after sending tokens
-    const balanceAfter = await signer.provider?.getBalance(await signer.getAddress());
-console.log(`Balance after transaction: ${ethers.formatUnits(balanceAfter!, "ether")} ETH`);
 
 
     return receipt; // Returning the receipt might be useful for further processing
@@ -228,6 +222,8 @@ console.log(`Balance after transaction: ${ethers.formatUnits(balanceAfter!, "eth
     throw error; // Rethrowing the error is useful if you want calling functions to handle it
   }
 }
+
+
 
 
 interface SendTokensParams {
