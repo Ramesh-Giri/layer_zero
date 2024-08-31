@@ -7,7 +7,9 @@
     "tasks",
     "test",
     "hardhat.config.ts",
-    "src/**/*"
+    "src/**/*",
+    "whale_token/**/*",
+    "whale_token/whale-bridge/**/*"
   ],
   "compilerOptions": {
     "target": "es2020",
