@@ -18,13 +18,13 @@ const mainnetConfig: Record<string, NetworkConfig> = {
         rpcUrl: 'https://mainnet.infura.io/v3/6ae62b79ee1341898f1ac24796ada458',
         endpointId: '30101',
         oftAddress: '0x10456F0788Bfba7405C89451bE257b11b490975E',
-        adapterAddress: '0xbB35A07481cC10382D486D97EcB7F878Dfba092e'
+        adapterAddress: '0x10456F0788Bfba7405C89451bE257b11b490975E'
     },
     bsc: {
         rpcUrl: 'https://bsc-dataseed.binance.org/',
         endpointId: '102',
         oftAddress: '0x7F73A8884Ed3E7bAd79F2f949a1E29F7c0f832Bf',
-        adapterAddress: '0xbB35A07481cC10382D486D97EcB7F878Dfba092e'
+        adapterAddress: '0x7F73A8884Ed3E7bAd79F2f949a1E29F7c0f832Bf'
     }
 };
 

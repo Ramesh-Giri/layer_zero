@@ -75,17 +75,6 @@ export async function setEnforcedOptions(signer: ethers.Signer): Promise<string>
 
     const nonce = await signer.getNonce('latest');
 
-    // // Manually estimate gas by calling the provider's estimateGas function
-    // const estimatedGas = await signer.provider.estimateGas({
-    //   to: sourceNetwork.adapterAddress,
-    //   data: sourceAdapterContract.interface.encodeFunctionData('setEnforcedOptions', [enforcedOptions]),
-    //   gasLimit: 100000, // Set a gas limit if required
-    //   gasPrice: ethers.parseUnits("20", "gwei"), // Gas price in gwei
-    //   nonce: nonce
-    // });
-    // // Add a buffer to the estimated gas
-    // const gasLimitWithBuffer = estimatedGas + 10000n;
-
     // Send the transaction with the estimated gas limit
     const txResponse = await sourceAdapterContract.setEnforcedOptions(enforcedOptions, {
       gasLimit: 10000, // Use the calculated gas limit with buffer
@@ -112,7 +101,10 @@ export async function estimateSendFees(
   encodedOptions: string, 
   signer: ethers.Signer
 ) {
-  const network = networkConfig.mainnet.base;
+
+  console.log(`Network : ${isBase ? 'Base' : 'Ethereum'}`);
+
+  const network = isBase ? networkConfig.mainnet.base : networkConfig.mainnet.ethereum;
   const provider = signer.provider as ethers.JsonRpcProvider;
   const whaleERC20Contract = new ethers.Contract(
     network.oftAddress,
@@ -120,15 +112,20 @@ export async function estimateSendFees(
     signer
   );
 
+
   const currentBalance = await whaleERC20Contract.balanceOf(await signer.getAddress());
   console.log(`Current token balance: ${ethers.formatUnits(currentBalance, 18)}`);
 
+  console.log(`Amount to send: ${amountToSend}`);
 
-  console.log(`Amount to send : ${amountToSend}`);
+  console.log(`Network adapter address: ${network.adapterAddress}`);
 
   const approvalAmount = ethers.parseUnits(amountToSend, 18);
   const approveTx = await whaleERC20Contract.approve(network.adapterAddress, approvalAmount);
   await approveTx.wait();
+
+  console.log(`Dest id: ${approveTx.hash}`);
+
 
   const _sendParam = {
     dstEid: dstEid,
@@ -161,7 +158,6 @@ export async function estimateSendFees(
   }
 }
 
-
 export async function sendTokensToDestination({
   amountToSend,
   msgFee,
@@ -171,7 +167,6 @@ export async function sendTokensToDestination({
   sourceAdapterAddress,
   ADAPTER_ABI,
   DESTINATION_ENDPOINT_ID,
-  
 }: SendTokensParams): Promise<ethers.TransactionReceipt | void> {
   try {
     // Validate input parameters
@@ -198,7 +193,6 @@ export async function sendTokensToDestination({
 
     const adapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, signer);
 
-
     // Sending tokens, passing msgFee as transaction options
     const txResponse = await adapterContract.send(
       sendParam,
@@ -212,8 +206,6 @@ export async function sendTokensToDestination({
     // Wait for the transaction to be mined
     const receipt = await txResponse.wait();
 
-
-
     return receipt; // Returning the receipt might be useful for further processing
 
   } catch (error) {
@@ -222,8 +214,6 @@ export async function sendTokensToDestination({
     throw error; // Rethrowing the error is useful if you want calling functions to handle it
   }
 }
-
-
 
 
 interface SendTokensParams {

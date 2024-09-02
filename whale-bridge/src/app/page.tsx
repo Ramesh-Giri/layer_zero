@@ -6,7 +6,7 @@ import styles from './page.module.css';
 import { BrowserProvider, Contract, formatUnits } from 'ethers';
 import WalletConnectProvider from "@walletconnect/web3-provider";
 import networkConfig from '../../../src/config/networks'; // Replace with your network configuration
-import { setEnforcedOptions,estimateSendFees, sendTokensToDestination } from '../../../src/utils/functions'; // Replace with your actual function or logic
+import { setEnforcedOptions, estimateSendFees, sendTokensToDestination } from '../../../src/utils/functions'; // Replace with your actual function or logic
 
 declare global {
   interface Window {
@@ -58,6 +58,14 @@ export default function Home() {
       try {
         await window.ethereum.request({ method: "eth_requestAccounts" });
         providerInstance = new ethers.BrowserProvider(window.ethereum);
+
+        // Listen for network changes
+        window.ethereum.on('chainChanged', () => {
+          window.location.reload(); // Reload the page on network change
+        });
+
+        // Store the connected wallet in local storage
+        localStorage.setItem('preferredWallet', 'metamask');
       } catch (error) {
         console.error("Error connecting to MetaMask:", error);
         return;
@@ -69,6 +77,9 @@ export default function Home() {
         });
         await walletConnectProvider.enable();
         providerInstance = new ethers.BrowserProvider(walletConnectProvider);
+
+        // Store the connected wallet in local storage
+        localStorage.setItem('preferredWallet', 'walletconnect');
       } catch (error) {
         console.error("Error connecting to WalletConnect:", error);
         return;
@@ -109,11 +120,19 @@ export default function Home() {
   const fetchTokenBalance = async (signerInstance: ethers.Signer, address: string) => {
     try {
       const tokenAddress = tokenAddresses[chainFrom]; // Use the correct token address based on chainFrom
+      console.log(`Fetching balance from chain: ${chainFrom}, tokenAddress: ${tokenAddress}`);
+      
       const tokenContract = new Contract(tokenAddress, tokenABI, signerInstance);
+      
       const balance = await tokenContract.balanceOf(address);
+      console.log(`Balance fetched: ${ethers.formatUnits(balance, 18)}`);
+      
       setTokenBalance(formatUnits(balance, 18)); // Assuming the token has 18 decimals
     } catch (err) {
-      setError('Failed to fetch token balance');
+      if(tokenBalance === '0') {
+        setError('Failed to fetch token balance. Please swith to the correct network.');
+      }
+      
       console.error('Token balance fetch error:', err);
     }
   };
@@ -137,7 +156,6 @@ export default function Home() {
       setError(''); // Clear any previous errors
   
       const signerInstance = await provider.getSigner(); // Await to resolve JsonRpcSigner
-        //const optionsData = await setEnforcedOptions(signerInstance);
 
       const Options = require('@layerzerolabs/lz-v2-utilities').Options;
       const _options = Options.newOptions().addExecutorLzReceiveOption(1000000, 1);
@@ -145,21 +163,20 @@ export default function Home() {
   
       // Get estimated fees
       const estimatedFees = await estimateSendFees(
-        networkConfig.mainnet.ethereum.endpointId, 
+        networkConfig.mainnet[chainTo].endpointId, 
         amount.toString(), 
         chainFrom === 'base', 
         optionsData, 
         signerInstance
       );
       
-  
       // Prepare the msgFee object using the estimated fees
       const msgFee = {
         nativeFee: BigInt(estimatedFees.nativeFee), // Convert to BigInt if necessary
         lzTokenFee: BigInt(estimatedFees.lzTokenFee) // Convert to BigInt if necessary
       };
   
-      console.log('Seding to address :', tokenAddresses[chainTo]);
+      console.log('Sending to address:', tokenAddresses[chainTo]);
       // If gas estimation succeeds, proceed to send the tokens
       const receipt = await sendTokensToDestination({
         amountToSend: amount.toString(),
@@ -167,17 +184,30 @@ export default function Home() {
         encodedOptions: optionsData,
         signer: signerInstance,
         destinationOftAddress: tokenAddresses[chainTo], // Use the appropriate token address
-        sourceAdapterAddress: networkConfig.mainnet.base.adapterAddress, // Replace with your adapter address
+        sourceAdapterAddress: networkConfig.mainnet[chainFrom].adapterAddress, // Dynamic adapter address
         ADAPTER_ABI: require('../../../artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json').abi, // Use correct ABI
-        DESTINATION_ENDPOINT_ID: networkConfig.mainnet.ethereum.endpointId, // Replace with appropriate endpoint ID
+        DESTINATION_ENDPOINT_ID: networkConfig.mainnet[chainTo].endpointId, // Dynamic endpoint ID
       });
   
-     console.log('Tokens sent successfully:', receipt);
+      console.log('Tokens sent successfully:', receipt);
   
-    } catch (err) {
-      setError('Failed to execute swap: ' + (err as Error).message);
-      console.error('Swap execution error:', err);
-    }
+    } catch (err: any) {
+          let errorMessage = 'Failed to execute swap: ';
+            
+          if (err.code === 'ACTION_REJECTED' && err.info?.error?.message) {
+            errorMessage += err.info.error.message;
+          } else if (err.message) {
+            errorMessage += err.message;
+          } else {
+            errorMessage += 'An unknown error occurred.';
+          }
+
+          if (err.transactionHash) {
+            errorMessage += ` Transaction hash: ${err.transactionHash}`;
+          }
+
+          setError(errorMessage);
+          console.error('Swap execution error:', err);    }
   };
   
 
@@ -203,19 +233,18 @@ export default function Home() {
         <h1 className={styles.title}>Welcome to Whale Bridge</h1>
         <div className={styles.swapContainer}>
           <div className={styles.swapRow}>
-          <select
-            className={styles.select}
-            value={chainFrom}
-            onChange={(e) => {
-              setChainFrom(e.target.value as 'ethereum' | 'base');
-              // Re-fetch the balance whenever the network changes
-              fetchTokenBalance(signer, walletAddress);
-            }}
-          >
-            <option value="ethereum">Ethereum</option>
-            <option value="base">Base</option>
-          </select>
-
+            <select
+              className={styles.select}
+              value={chainFrom}
+              onChange={(e) => {
+                setChainFrom(e.target.value as 'ethereum' | 'base');
+                // Re-fetch the balance whenever the network changes
+                fetchTokenBalance(signer, walletAddress);
+              }}
+            >
+              <option value="ethereum">Ethereum</option>
+              <option value="base">Base</option>
+            </select>
 
             <input
               type="text"
