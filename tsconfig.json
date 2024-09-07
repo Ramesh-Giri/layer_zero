@@ -1,23 +1,43 @@
 {
-  "exclude": [
-    "node_modules"
-  ],
-  "include": [
-    "deploy",
-    "tasks",
-    "test",
-    "hardhat.config.ts",
-    "src/**/*",
-    "whale_token/**/*",
-    "whale_token/whale-bridge/**/*"
-  ],
   "compilerOptions": {
-    "target": "es2020",
-    "module": "commonjs",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
+    "target": "es2020",  // Prefer the newer target (es2020)
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,  // Allow JavaScript files
     "skipLibCheck": true,
-    "resolveJsonModule": true
-  }
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,  // Ensure no files are emitted (good for type checking only)
+    "esModuleInterop": true,  // Support for ES module interop
+    "module": "esnext",  // Prefer esnext for compatibility with Next.js
+    "moduleResolution": "node",  // Use node-style module resolution
+    "resolveJsonModule": true,  // Allow importing JSON files
+    "isolatedModules": true,  // Required for Next.js to treat every file as a separate module
+    "jsx": "preserve",  // For Next.js, keep JSX
+    "incremental": true,  // Enable incremental compilation for faster builds
+    "plugins": [
+      {
+        "name": "next"  // Next.js plugin
+      }
+    ]
+  },
+  "include": [
+    "next-env.d.ts",  // For Next.js type declarations
+    "**/*.ts",  // Include TypeScript files
+    "**/*.tsx",  // Include TypeScript files with JSX
+    ".next/types/**/*.ts",  // Next.js types
+    "deploy",  // Backend deploy folder
+    "tasks",  // Backend tasks folder
+    "test",  // Backend test folder
+    "hardhat.config.ts",  // Hardhat configuration
+    "src/**/*",  // Include src folder
+    "whale_token/**/*",  // Include whale_token folder
+    "whale_token/whale-bridge/**/*"  // Include old whale-bridge folder
+  ],
+  "exclude": [
+    "node_modules"  // Exclude node_modules
+  ]
 }

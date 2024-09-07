@@ -3,12 +3,14 @@
   "version": "0.2.3",
   "private": true,
   "workspaces": [
-    "whale_token",
-    "whale_token/whale-bridge"
+    "whale_token"
   ],
   "license": "MIT",
   "scripts": {
+    "dev": "next dev",
     "clean": "rm -rf artifacts cache out",
+    "build": "next build",
+    "start": "next start",
     "compile": "$npm_execpath run compile:forge && $npm_execpath run compile:hardhat",
     "compile:forge": "forge build",
     "compile:hardhat": "hardhat compile",
@@ -48,7 +50,9 @@
     "@types/chai": "^4.3.11",
     "@types/express": "^4.17.21",
     "@types/mocha": "^10.0.6",
-    "@types/node": "^22.5.1",
+    "@types/node": "^22.5.4",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
     "chai": "^4.4.1",
     "dotenv": "^16.4.5",
     "eslint-plugin-jest-extended": "~2.0.0",
@@ -61,7 +65,7 @@
     "solhint": "^4.1.1",
     "solidity-bytes-utils": "^0.8.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.5.4"
   },
   "engines": {
     "node": ">=18.16.0"
@@ -81,6 +85,9 @@
     "bip39": "^3.1.0",
     "ethereumjs-wallet": "^1.0.2",
     "express": "^4.19.2",
+    "next": "^14.2.8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "web3": "^4.10.0"
   }
 }
