@@ -14,7 +14,7 @@ export async function setPeerContracts({ networks, signer }: PeerContractOptions
         const sourceOFTContract = new ethers.Contract(
             sourceNetwork.oftAddress,
           
-            require(`../../../whale_token/artifacts/contracts/WhaleOFT.sol/WhaleOFT.json`).abi,
+            require(`../../artifacts/contracts/WhaleOFT.sol/WhaleOFT.json`).abi,
 
             signer.connect(sourceNetwork.provider)
         );
@@ -25,7 +25,7 @@ export async function setPeerContracts({ networks, signer }: PeerContractOptions
             const destinationOFTBytes32 = ethers.zeroPadValue(destinationNetwork.oftAddress, 32);
             const destinationAdapterContract = new ethers.Contract(
                 destinationNetwork.adapterAddress,
-                require(`../../../whale_token/artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json`).abi,
+                require(`../../artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json`).abi,
                 signer.connect(destinationNetwork.provider)
             );
 
