@@ -1,9 +1,7 @@
 
 import networkConfig from '../config/networks';
-import { ethers, utils } from 'ethers';
-import { providers } from 'ethers';
-
-type TransactionReceipt = providers.TransactionReceipt;
+import { ethers } from 'ethers';
+import { Signer } from 'ethers';
 
 interface PeerContractOptions {
     networks: any[];
@@ -12,7 +10,7 @@ interface PeerContractOptions {
 
 export async function setPeerContracts({ networks, signer }: PeerContractOptions) {
     for (const sourceNetwork of networks) {
-        const sourceAdapterBytes32 = utils.zeroPad(sourceNetwork.adapterAddress, 32);
+        const sourceAdapterBytes32 = ethers.zeroPadValue(sourceNetwork.adapterAddress, 32);
         const sourceOFTContract = new ethers.Contract(
             sourceNetwork.oftAddress,
           
@@ -24,7 +22,7 @@ export async function setPeerContracts({ networks, signer }: PeerContractOptions
         for (const destinationNetwork of networks) {
             if (sourceNetwork.networkKey === destinationNetwork.networkKey) continue;
 
-            const destinationOFTBytes32 = utils.zeroPad(destinationNetwork.oftAddress, 32);
+            const destinationOFTBytes32 = ethers.zeroPadValue(destinationNetwork.oftAddress, 32);
             const destinationAdapterContract = new ethers.Contract(
                 destinationNetwork.adapterAddress,
                 require(`../../../whale_token/artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json`).abi,
@@ -48,14 +46,12 @@ export async function setPeerContracts({ networks, signer }: PeerContractOptions
     }
 }
 
-
-
 export async function setEnforcedOptions(signer: ethers.Signer): Promise<string> {
   if (!signer || !signer.provider) {
     throw new Error("Invalid signer or provider. Please ensure the signer is connected.");
   }
-
   const Options = require('@layerzerolabs/lz-v2-utilities').Options;
+
   const _options = Options.newOptions().addExecutorLzReceiveOption(1000000, 1);
   const optionsData = _options.toHex();
 
@@ -64,7 +60,7 @@ export async function setEnforcedOptions(signer: ethers.Signer): Promise<string>
       eid: networkConfig.mainnet.ethereum.endpointId,
       msgType: 1,
       options: optionsData,
-    } 
+    }
   ];
 
   try {
@@ -75,13 +71,14 @@ export async function setEnforcedOptions(signer: ethers.Signer): Promise<string>
       signer
     );
 
-    const nonce = await signer.getTransactionCount('latest');
+    const nonce = await signer.getNonce('latest');
 
-    // Send the transaction with the estimated gas limit
+  
+    // Send the transaction with the estimated gas limit and gas price
     const txResponse = await sourceAdapterContract.setEnforcedOptions(enforcedOptions, {
-      gasLimit: 10000, // Use the calculated gas limit with buffer
-      gasPrice: utils.formatUnits("20", "gwei"), // Ensure gasPrice is parsed correctly
-      nonce: BigInt(nonce),
+      gasLimit: 1000000, // Adjusted gas limit if needed
+      gasPrice: ethers.parseUnits("23", "gwei"), // Gas price in gwei
+      nonce: nonce,
     });
 
     const receipt = await txResponse.wait();
@@ -96,70 +93,46 @@ export async function setEnforcedOptions(signer: ethers.Signer): Promise<string>
 
 
 
-export async function estimateSendFees(
-  dstEid: any, 
-  amountToSend: string, 
-  isBase: boolean, 
-  encodedOptions: string, 
-  signer: ethers.Signer
-) {
-
-  console.log(`Network : ${isBase ? 'Base' : 'Ethereum'}`);
-
-  const network = isBase ? networkConfig.mainnet.base : networkConfig.mainnet.ethereum;
-  const provider = signer.provider;
-
-  const whaleERC20Contract = new ethers.Contract(
-    network.oftAddress,
-    require('../abi/WhaleTokens.json'),
-    signer
-  );
-
-
-  const currentBalance = await whaleERC20Contract.balanceOf(await signer.getAddress());
-  console.log(`Current token balance: ${utils.formatUnits(currentBalance, 18)}`);
-
-  console.log(`Amount to send: ${amountToSend}`);
-
-  console.log(`Network adapter address: ${network.adapterAddress}`);
-
-  const approvalAmount = utils.formatUnits(amountToSend, 18);
-  const approveTx = await whaleERC20Contract.approve(network.adapterAddress, approvalAmount);
-  await approveTx.wait();
-
-  console.log(`Dest id: ${approveTx.hash}`);
-
-
-  const _sendParam = {
-    dstEid: dstEid,
-    to: utils.zeroPad(await signer.getAddress(), 32),
-    amountLD: approvalAmount,
-    minAmountLD: approvalAmount,
-    extraOptions: encodedOptions,
-    composeMsg: utils.toUtf8Bytes(""),
-    oftCmd: utils.toUtf8Bytes("")
-  };
-
-  try {
-    const adapterContract = new ethers.Contract(
-      network.adapterAddress,
-      require(`../../../whale_token/artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json`).abi,
-      signer
+export async function estimateSendFees(dstEid: any, amountToSend: any, isBase: boolean, encodedOptions: string, signer: ethers.Signer) {
+    const network = networkConfig.mainnet.base;
+    const provider = signer.provider as ethers.JsonRpcProvider;
+    const whaleERC20Contract = new ethers.Contract(
+        network.oftAddress,
+        require('../abi/WhaleTokens.json'),
+        signer.connect(provider)
     );
-    const feeEstimate = await adapterContract.quoteSend(_sendParam, false);
 
-    console.log(`Estimated fees: ${utils.formatUnits(feeEstimate.nativeFee, "ether")} ETH, ${utils.formatUnits(feeEstimate.lzTokenFee, 18)} LZT`);
+    const currentBalance = await whaleERC20Contract.balanceOf(await signer.getAddress());
+    console.log(`Current token balance: ${ethers.formatUnits(currentBalance, 18)}`);
 
-    // Return the fees to be used in the calling function
-    return {
-      nativeFee: feeEstimate.nativeFee,
-      lzTokenFee: feeEstimate.lzTokenFee
+    const approvalAmount = amountToSend;
+    const approveTx = await whaleERC20Contract.approve(network.adapterAddress, approvalAmount);
+    await approveTx.wait();
+
+    const _sendParam = {
+        dstEid: dstEid,
+        to: ethers.zeroPadValue(await signer.getAddress(), 32),
+        amountLD: approvalAmount,
+        minAmountLD: approvalAmount,
+        extraOptions: encodedOptions,
+        composeMsg: ethers.toUtf8Bytes(""),
+        oftCmd: ethers.toUtf8Bytes("")
     };
-  } catch (error) {
-    console.error(`Error estimating fees: ${error}`);
-    throw new Error('Failed to estimate fees');
-  }
+
+    try {
+        const adapterContract = new ethers.Contract(
+            network.adapterAddress,
+            require(`../../../whale_token/artifacts/contracts/WhaleAdapter.sol/WhaleAdapter.json`).abi,
+            signer.connect(provider)
+        );
+        const feeEstimate = await adapterContract.quoteSend(_sendParam, false);
+
+        console.log(`Estimated fees: ${ethers.formatUnits(feeEstimate.nativeFee, "ether")} ETH, ${ethers.formatUnits(feeEstimate.lzTokenFee, 18)} LZT`);
+    } catch (error) {
+        console.error(`Error estimating fees: ${error}`);
+    }
 }
+
 
 export async function sendTokensToDestination({
   amountToSend,
@@ -170,31 +143,48 @@ export async function sendTokensToDestination({
   sourceAdapterAddress,
   ADAPTER_ABI,
   DESTINATION_ENDPOINT_ID,
-}: SendTokensParams): Promise<TransactionReceipt | void> {
+}: SendTokensParams): Promise<ethers.TransactionReceipt | void> {
   try {
     // Validate input parameters
     if (!amountToSend || parseFloat(amountToSend.toString()) <= 0) {
       throw new Error("Invalid or zero amount to send specified.");
     }
-    if (!utils.isAddress(destinationOftAddress)) {
+    if (!ethers.isAddress(destinationOftAddress)) {
       throw new Error("Invalid OFT address specified.");
     }
 
     // Parse the amount to the correct unit
-    const approvalAmount = utils.parseUnits(amountToSend, 18);
+    const approvalAmount = ethers.parseUnits(amountToSend.toString(), 18);
 
     // Prepare the send parameters
     const sendParam = {
       dstEid: DESTINATION_ENDPOINT_ID,
-      to: utils.zeroPad(await signer.getAddress(), 32),
+      to: ethers.zeroPadValue(await signer.getAddress(), 32),
       amountLD: approvalAmount,
       minAmountLD: approvalAmount,
       extraOptions: encodedOptions,
-      composeMsg: utils.toUtf8Bytes(""),
-      oftCmd: utils.toUtf8Bytes("")
+      composeMsg: ethers.toUtf8Bytes(""),
+      oftCmd: ethers.toUtf8Bytes("")
     };
 
     const adapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, signer);
+
+    // Log the user's balance before sending tokens
+    const balanceBefore = await signer.provider?.getBalance(await signer.getAddress());
+    console.log(`Balance before transaction: ${ethers.formatUnits(balanceBefore!, "ether")} ETH`);
+    
+
+    // Estimate gas
+    const gasEstimate = await adapterContract.estimateGas.send(
+      sendParam,
+      msgFee,
+      await signer.getAddress(),
+      { value: msgFee.nativeFee }
+    );
+    console.log(`Estimated Gas: ${gasEstimate.toString()}`);
+
+    const gasLimitWithBuffer = BigInt(gasEstimate.toString()) + 10000n;
+
 
     // Sending tokens, passing msgFee as transaction options
     const txResponse = await adapterContract.send(
@@ -202,12 +192,21 @@ export async function sendTokensToDestination({
       msgFee,
       await signer.getAddress(),
       {
+        gasLimit: gasLimitWithBuffer, // Add buffer as BigInt
         value: msgFee.nativeFee, // Ensure to pass the payable amount if required                
       }
     );
 
+    console.log(`Transaction Hash: ${txResponse.hash}`);
+
     // Wait for the transaction to be mined
     const receipt = await txResponse.wait();
+    console.log(`Transaction confirmed in block: ${receipt.blockNumber}`);
+
+    // Log the user's balance after sending tokens
+    const balanceAfter = await signer.provider?.getBalance(await signer.getAddress());
+console.log(`Balance after transaction: ${ethers.formatUnits(balanceAfter!, "ether")} ETH`);
+
 
     return receipt; // Returning the receipt might be useful for further processing
 
