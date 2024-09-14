@@ -1,17 +1,15 @@
 import { ethers } from 'ethers';
-import dotenv from 'dotenv';
 import networkConfig from './config/networks';
 import express from 'express';
 import { setPeerContracts, setEnforcedOptions, estimateSendFees } from './utils/functions';
 
-// Load environment variables from .env file
-dotenv.config();
+
 
 function initializeNetworks(env: 'mainnet' | 'testnet', signer: ethers.Signer): any[] {
     const selectedConfig = networkConfig[env];
     return Object.keys(selectedConfig).map((networkKey) => {
         const network = selectedConfig[networkKey];
-        const provider = signer.provider as ethers.JsonRpcProvider;
+        const provider = signer.provider;
 
         return {
             networkKey,
@@ -32,7 +30,7 @@ app.post('/estimate-gas', async (req, res) => {
     const { endpointId, amount, isBaseNetwork, optionsData, walletProvider } = req.body;
 
     try {
-        const provider = new ethers.BrowserProvider(walletProvider);
+        const provider = walletProvider;
         const signer = await provider.getSigner(); // Await here to get the resolved JsonRpcSigner
 
         // Initialize networks and set peer contracts as needed

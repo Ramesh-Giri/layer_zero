@@ -7,27 +7,31 @@
   ],
   "license": "MIT",
   "scripts": {
-    "dev": "next dev",
     "clean": "rm -rf artifacts cache out",
-    "build": "next build",
-    "start": "next start",
     "compile": "$npm_execpath run compile:forge && $npm_execpath run compile:hardhat",
     "compile:forge": "forge build",
-    "compile:hardhat": "hardhat compile",    
+    "compile:hardhat": "hardhat compile",
+    "lint": "$npm_execpath run lint:js && $npm_execpath run lint:sol",
+    "lint:fix": "eslint --fix '**/*.{js,ts,json}' && prettier --write . && solhint 'contracts/**/*.sol' --fix --noPrompt",
+    "lint:js": "eslint '**/*.{js,ts,json}' && prettier --check .",
+    "lint:sol": "solhint 'contracts/**/*.sol'",
     "test": "$npm_execpath run test:forge && $npm_execpath run test:hardhat",
     "test:forge": "forge test",
-    "test:hardhat": "hardhat test"
+    "test:hardhat": "hardhat test",
+    "build:backend": "tsc && node dist/index.js",
+    "start:backend": "node dist/index.js"
   },
   "resolutions": {
-    "ethers": "^6.13.2",
-    "hardhat-deploy": "^0.12.1"
+    "ethers": "^5.7.0",
+    "hardhat-deploy": "^0.12.4"
   },
   "devDependencies": {
-    "@babel/core": "^7.23.9",  
+    "@babel/core": "^7.23.9",
+    "@layerzerolabs/eslint-config-next": "~2.1.27",
     "@layerzerolabs/lz-definitions": "~2.1.27",
     "@layerzerolabs/lz-evm-messagelib-v2": "^2.3.40",
     "@layerzerolabs/lz-evm-oapp-v2": "~2.1.27",
-    "@layerzerolabs/lz-evm-protocol-v2": "^2.3.40",
+    "@layerzerolabs/lz-evm-protocol-v2": "^2.3.41",
     "@layerzerolabs/lz-evm-v1-0.7": "^2.3.40",
     "@layerzerolabs/lz-v2-utilities": "~2.1.27",
     "@layerzerolabs/oapp-evm": "^0.0.4",
@@ -39,48 +43,46 @@
     "@layerzerolabs/toolbox-hardhat": "~0.2.4",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
     "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@nomiclabs/hardhat-waffle": "^2.0.6",
     "@openzeppelin/contracts": "^5.0.1",
-    "@openzeppelin/contracts-upgradeable": "^5.0.1",    
-    "@types/chai": "^4.3.11",
+    "@openzeppelin/contracts-upgradeable": "^5.0.1",
+    "@rushstack/eslint-patch": "^1.7.0",
+    "@types/chai": "^4.3.19",
     "@types/express": "^4.17.21",
-    "@types/mocha": "^10.0.6",
+    "@types/keyv": "^4.2.0",
+    "@types/mocha": "^10.0.7",
     "@types/node": "^22.5.4",
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
     "chai": "^4.4.1",
-    "dotenv": "^16.4.5",  
-    "ethers": "^6.13.2",
-    "hardhat": "^2.19.5",
+    "dotenv": "^16.4.5",
+    "eslint-plugin-jest-extended": "~2.0.0",
+    "hardhat": "^2.22.10",
     "hardhat-contract-sizer": "^2.10.0",
-    "hardhat-deploy": "^0.12.1",
+    "hardhat-deploy": "^0.12.4",
+    "keyv": "^5.0.1",
     "mocha": "^10.2.0",
     "prettier": "^3.2.5",
     "solhint": "^4.1.1",
     "solidity-bytes-utils": "^0.8.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.5.4"
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=18.16.0"
   },
-  "pnpm": {
-    "overrides": {
-      "ethers": "^6.13.2",
-      "hardhat-deploy": "^0.12.1"
-    }
-  },
-  "overrides": {
-    "ethers": "^6.13.2",
-    "hardhat-deploy": "^0.12.1"
-  },
   "dependencies": {
+    "@types/cacheable-request": "6.0.1",
     "@walletconnect/web3-provider": "^1.8.0",
     "bip39": "^3.1.0",
     "ethereumjs-wallet": "^1.0.2",
+    "ethers": "^5.7.2",
     "express": "^4.19.2",
-    "next": "^14.2.8",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
     "web3": "^4.10.0"
-  }
+  },
+  "description": "<p align=\"center\">   <a href=\"https://layerzero.network\">     <img alt=\"LayerZero\" style=\"max-width: 500px\" src=\"https://d3a2dpnnrypp5h.cloudfront.net/bridge-app/lz.png\"/>   </a> </p>",
+  "main": ".eslintrc.js",
+  "directories": {
+    "test": "test"
+  },
+  "keywords": [],
+  "author": ""
 }
