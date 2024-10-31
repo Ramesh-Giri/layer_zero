@@ -1,14 +1,15 @@
-import { ethers, } from "ethers";
-import dotenv from 'dotenv';
-import { EndpointId, } from "@layerzerolabs/lz-definitions";
-import { Interface } from "ethers/lib/utils";
+const ethers = require("ethers");
+const dotenv = require("dotenv");
+
+const EndpointId = require("@layerzerolabs/lz-definitions");
+
 
 const tokenABI = require('./abi/WhaleTokens.json');
 
 //import OptionsBuilder from "../contracts/OptionsBuilder.sol";
 
+const Options = require("@layerzerolabs/lz-v2-utilities");
 
-import { Options } from '@layerzerolabs/lz-v2-utilities';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -17,7 +18,7 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
 const RPC_URL_SOURCE = 'https://mainnet.base.org';
 const RPC_URL_DESTINATION = 'https://mainnet.infura.io/v3/6ae62b79ee1341898f1ac24796ada458';
-const RPC_URL_DESTINATION_BSC = 'https://bsc-dataseed.binance.org/';
+const RPC_URL_DESTINATION_BSC = 'https://bsc-dataseed.binance.org';
 
 if (!PRIVATE_KEY) {
     console.error('NO PRIVATE KEY  not found in environment variables');
@@ -27,13 +28,14 @@ if (!PRIVATE_KEY) {
 
 const SOURCE_ENDPOINT_ID = '30184';  // here base 
 const DESTINATION_ENDPOINT_ID = '30101';  // here eth 
-const DESTINATION_ENDPOINT_ID_BSC = '102';  // here BSC 
+const DESTINATION_ENDPOINT_ID_BSC = '30102';  // here BSC 
 
 
 /* -------------------------------- ERC 20 contract ( SOURCE:  here: BASE_ SEP)-------------------------------- */
 
 // Using Sepolia network's Infura endpoint
 const sourceProvider = new ethers.providers.JsonRpcProvider(RPC_URL_SOURCE);
+
 
 // Connect to the Ethereum network
 // Create a wallet from the mnemonic
@@ -52,7 +54,6 @@ const OFT_ABI = require('../artifacts/contracts/WhaleOFT.sol/WhaleOFT.json').abi
 const destinationProvider = new ethers.providers.JsonRpcProvider(RPC_URL_DESTINATION);
 const walletDestination = new ethers.Wallet(PRIVATE_KEY).connect(destinationProvider);
 
- // TODO://Change this to the OFT contract address on the destination network
  const destinationOftAddress = '0x10456F0788Bfba7405C89451bE257b11b490975E';  
 
  const destinationOFTContract = new ethers.Contract(destinationOftAddress, OFT_ABI, walletDestination);
@@ -126,8 +127,8 @@ async function setEnforcedOptions() {
         console.log('Transaction confirmed in block:', receipt.blockNumber);
 
 
-        await estimateSendFees(DESTINATION_ENDPOINT_ID, "200000000", false, optionsData);
-        await estimateSendFees(DESTINATION_ENDPOINT_ID_BSC, "200000000", false, optionsData);
+        await estimateSendFees(DESTINATION_ENDPOINT_ID, "2000", false, optionsData);
+        await estimateSendFees(DESTINATION_ENDPOINT_ID_BSC, "2000", false, optionsData);
 
     } catch (error) {
         console.error('Error setting enforced options:', error);
@@ -135,124 +136,143 @@ async function setEnforcedOptions() {
 }
 
 
-// Assume this function is part of your setup process and is called when necessary
 async function setPeerContracts() {
     try {
-
         const sourceAdapterBytes32 = ethers.utils.hexZeroPad(sourceAdapterAddress, 32);
         const destinationOFTBytes32 = ethers.utils.hexZeroPad(destinationOftAddress, 32);
         const destinationBscOFTBytes32 = ethers.utils.hexZeroPad(destinationBscAddress, 32);
-        
+
+        // Calculate gas fee estimation function
+        const estimateGasFee = (gasLimit: any, priorityFee: any, maxFee: any) => {
+            const gasPrice = ethers.utils.parseUnits((priorityFee + maxFee).toString(), "gwei");
+            const fee = ethers.BigNumber.from(gasLimit).mul(gasPrice); // Use BigNumber for multiplication
+            return ethers.utils.formatEther(fee); // Convert to ETH
+        };
 
         // Check pairing status between source adapter and destination OFT (Ethereum)
-
-        const isAdapterPeerOfOFT = await destinationOFTContract.isPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32); //  SOURCE endpint id
-        const isOFTPeerOfAdapter = await sourceAdapterContract.isPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32); //  DESTINATION endpoint id
+        const isAdapterPeerOfOFT = await destinationOFTContract.isPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32);
+        const isOFTPeerOfAdapter = await sourceAdapterContract.isPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
 
         if (!isAdapterPeerOfOFT || !isOFTPeerOfAdapter) {
             console.log("Pairing...");
 
-            console.log("Pending hereee");
             const txAdapter = await sourceAdapterContract.setPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
-            console.log("Pending hereee");
             await txAdapter.wait();
             console.log("Peered OFT to Adapter");
 
             const tx = await destinationOFTContract.setPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32);
             await tx.wait();
             console.log("Peered Adapter to OFT");
-
-
-            console.log(`Adapter to OFT peer status: ${isAdapterPeerOfOFT}`);
-
-
-            console.log(`OFT to Adapter peer status: ${isOFTPeerOfAdapter}`);
-        }else{
+        } else {
             console.log("Already paired");
         }
 
-
-
-                // Adapter to BSC OFT and vice versa
+        // Adapter to BSC OFT and vice versa
         try {
             const isAdapterPeerOfBscOFT = await destinationBscContract.isPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32);
             const isBscOFTPeerOfAdapter = await sourceAdapterContract.isPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32);
-
+        
             if (!isAdapterPeerOfBscOFT || !isBscOFTPeerOfAdapter) {
-                console.log("Pairing Adapter to BSC OFT and vice versa...");
 
+               // If the adapter is not yet paired with BSC OFT, attempt pairing
                 if (!isAdapterPeerOfBscOFT) {
-                    console.log("Pairing Adapter to BSC OFT...");
-                    const txAdapterToBscOFT = await sourceAdapterContract.setPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32, {
-                        gasLimit: 3000000,
-                        maxPriorityFeePerGas: ethers.utils.parseUnits("1.0", "gwei"), // Adjust as needed
-                        maxFeePerGas: ethers.utils.parseUnits("23.0", "gwei") // Adjust as needed
+                    console.log("Attempting to pair Adapter to BSC OFT...");
+                    const tx = {
+                        to: sourceAdapterContract.address,
+                        data: sourceAdapterContract.interface.encodeFunctionData("setPeer", [
+                            DESTINATION_ENDPOINT_ID_BSC,
+                            destinationBscOFTBytes32
+                        ]),
+                        gasLimit: 700000 // Adjust if necessary
+                    };
+                    
+                    try {
+                        const txResponse = await signer.sendTransaction(tx); // signer instance here
+                        await txResponse.wait();
+                    
+                        console.log(`Transaction Hash (Adapter to BSC OFT): ${txResponse.hash}`);
+                        console.log("Adapter to BSC OFT paired successfully.");
+                    } catch (error) {
+                        console.error("Failed to pair Adapter to BSC OFT:", error);
+                    }
+                    
 
-                    });
-                    await txAdapterToBscOFT.wait();
-                    console.log("Adapter to BSC OFT paired");
-                }
 
-                if (!isBscOFTPeerOfAdapter) {
-                    console.log("Pairing BSC OFT to Adapter...");
-                    const txBscOFTToAdapter = await destinationBscContract.setPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32, {
-                        gasLimit: 3000000,
-                        maxPriorityFeePerGas: ethers.utils.parseUnits("1.0", "gwei"), // Adjust as needed
-                        maxFeePerGas: ethers.utils.parseUnits("23.0", "gwei") // Adjust as needed
-
-                    });
-                    await txBscOFTToAdapter.wait();
-                    console.log("BSC OFT to Adapter paired");
-                }
+        
+                // // If BSC OFT is not yet paired with the adapter, attempt pairing
+                // if (!isBscOFTPeerOfAdapter) {
+                //     console.log("Attempting to pair BSC OFT to Adapter...");
+                //     try {
+                //         const txBscOFTToAdapter = await destinationBscContract.setPeer(SOURCE_ENDPOINT_ID, sourceAdapterBytes32, {
+                //             gasLimit: gasLimit,
+                //             maxPriorityFeePerGas: ethers.utils.parseUnits(priorityFee.toString(), "gwei"),
+                //             maxFeePerGas: ethers.utils.parseUnits(maxFee.toString(), "gwei")
+                //         });
+                //         console.log(`Transaction Hash (BSC OFT to Adapter): ${txBscOFTToAdapter.hash}`);
+                //         await txBscOFTToAdapter.wait();
+                //         console.log("BSC OFT to Adapter paired successfully.");
+                //     } catch (error) {
+                //         console.error("Failed to pair BSC OFT to Adapter:", error);
+                //     }
+                // }
+            }
+            } else {
+                console.log("Already paired.");
             }
         } catch (error) {
-            console.error("An error occurred:", error);
+            console.error("An error occurred in the pairing process:", error);
         }
+        
 
+        // // Ethereum OFT to BSC OFT and vice versa
+        // try {
+        //     const isEthOFTPeerOfBscOFT = await destinationBscContract.isPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
+        //     const isBscOFTPeerOfEthOFT = await destinationOFTContract.isPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32);
 
+        //     if (!isEthOFTPeerOfBscOFT || !isBscOFTPeerOfEthOFT) {
+        //         console.log("Pairing Ethereum OFT to BSC OFT and vice versa...");
 
-        try{
-         // Ethereum OFT to BSC OFT and vice versa
-        const isEthOFTPeerOfBscOFT = await destinationBscContract.isPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
-        const isBscOFTPeerOfEthOFT = await destinationOFTContract.isPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32);
+        //         if (!isEthOFTPeerOfBscOFT) {
+        //             const gasLimit = 3000000;
+        //             const priorityFee = 2.0; // in Gwei
+        //             const maxFee = 100.0; // in Gwei
+        //             const estimatedFee = estimateGasFee(gasLimit, priorityFee, maxFee);
+        //             console.log(`Estimated fee to pair Ethereum OFT to BSC OFT: ${estimatedFee} ETH`);
 
-        if (!isEthOFTPeerOfBscOFT || !isBscOFTPeerOfEthOFT) {
-            console.log("Pairing Ethereum OFT to BSC OFT and vice versa...");
+        //             const txEthOFTToBscOFT = await destinationOFTContract.setPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32, {
+        //                 gasLimit: gasLimit,
+        //                 maxPriorityFeePerGas: ethers.utils.parseUnits(priorityFee.toString(), "gwei"),
+        //                 maxFeePerGas: ethers.utils.parseUnits(maxFee.toString(), "gwei")
+        //             });
+        //             await txEthOFTToBscOFT.wait();
+        //             console.log("Ethereum OFT to BSC OFT paired");
+        //         }
 
-            if (!isEthOFTPeerOfBscOFT) {
-                const txEthOFTToBscOFT = await destinationOFTContract.setPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32, {
-                    gasLimit: 3000000,
-                    maxPriorityFeePerGas: ethers.utils.parseUnits("2.0", "gwei"), // Adjust as needed
-                    maxFeePerGas: ethers.utils.parseUnits("100.0", "gwei") // Adjust as needed
+        //         if (!isBscOFTPeerOfEthOFT) {
+        //             const gasLimit = 3000000;
+        //             const priorityFee = 2.0; // in Gwei
+        //             const maxFee = 100.0; // in Gwei
+        //             const estimatedFee = estimateGasFee(gasLimit, priorityFee, maxFee);
+        //             console.log(`Estimated fee to pair BSC OFT to Ethereum OFT: ${estimatedFee} ETH`);
 
-
-                 });
-                await txEthOFTToBscOFT.wait();
-                console.log("Ethereum OFT to BSC OFT paired");
-            }
-
-            if (!isBscOFTPeerOfEthOFT) {
-                const txBscOFTToEthOFT = await destinationBscContract.setPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32, {
-                    gasLimit: 3000000,
-                    maxPriorityFeePerGas: ethers.utils.parseUnits("2.0", "gwei"), // Adjust as needed
-                    maxFeePerGas: ethers.utils.parseUnits("100.0", "gwei") // Adjust as needed
-
-
-                 });
-                await txBscOFTToEthOFT.wait();
-                console.log("BSC OFT to Ethereum OFT paired");
-            }
-        }
-    } catch (error) {
-        console.error("An error occurred:", error);
-    }
-
-
+        //             const txBscOFTToEthOFT = await destinationBscContract.setPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32, {
+        //                 gasLimit: gasLimit,
+        //                 maxPriorityFeePerGas: ethers.utils.parseUnits(priorityFee.toString(), "gwei"),
+        //                 maxFeePerGas: ethers.utils.parseUnits(maxFee.toString(), "gwei")
+        //             });
+        //             await txBscOFTToEthOFT.wait();
+        //             console.log("BSC OFT to Ethereum OFT paired");
+        //         }
+        //     }
+        // } catch (error) {
+        //     console.error("An error occurred:", error);
+        // }
 
     } catch (error) {
         console.error("An error occurred:", error);
     }
 }
+
 
 async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boolean, encodedOptions: any) {
 
@@ -437,7 +457,7 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
 
          await setPeerContracts();
 
-      //  await setEnforcedOptions();
+      // await setEnforcedOptions();
 
         // Estimate send fees
 

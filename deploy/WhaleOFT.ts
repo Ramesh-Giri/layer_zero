@@ -72,49 +72,49 @@
 
 
 
-// // import assert from 'assert'
+// import assert from 'assert'
 
-// // import { type DeployFunction } from 'hardhat-deploy/types'
+// import { type DeployFunction } from 'hardhat-deploy/types'
 
-// // const contractName = 'WhaleAdapter'
+// const contractName = 'WhaleAdapter'
 
-// // const deploy: DeployFunction = async (hre) => {
-// //     const { getNamedAccounts, deployments,ethers } = hre
+// const deploy: DeployFunction = async (hre) => {
+//     const { getNamedAccounts, deployments,ethers } = hre
 
-// //     const { deploy } = deployments
-// //     const { deployer } = await getNamedAccounts()
+//     const { deploy } = deployments
+//     const { deployer } = await getNamedAccounts()
 
-// //     assert(deployer, 'Missing named deployer account')
+//     assert(deployer, 'Missing named deployer account')
 
-// //     const tokenAdress = '0x0702567B5FD4B823454dEEaDc7Eec8658b2AcB2F';
-// //     console.log(`Network: ${hre.network.name}`)
-// //     console.log(`Deployer: ${deployer}`)
-
-
-// //         // Check deployer balance
-// //     const balance = await ethers.provider.getBalance(deployer);
-// //     console.log(`Deployer balance: ${ethers.utils.formatEther(balance)} ETH`);
-
-// //     const endpointV2Deployment = await hre.deployments.get('EndpointV2')
+//     const tokenAdress = 'UPDATE_WITH_SOURCE_TOKEN_ADDRESS';
+//     console.log(`Network: ${hre.network.name}`)
+//     console.log(`Deployer: ${deployer}`)
 
 
-// //     const { address } = await deploy(contractName, {
-// //         from: deployer,
-// //         args: [
-// //             tokenAdress,            
-// //             endpointV2Deployment.address, // LayerZero's EndpointV2 address
-// //             deployer, // owner
-// //         ],
-// //         log: true,
-// //         skipIfAlreadyDeployed: false,
-// //     })
+//         // Check deployer balance
+//     const balance = await ethers.provider.getBalance(deployer);
+//     console.log(`Deployer balance: ${ethers.utils.formatEther(balance)} ETH`);
 
-// //     console.log(`Deployed Adapter: ${contractName}, network: ${hre.network.name}, address: ${address}`)
-// // }
+//     const endpointV2Deployment = await hre.deployments.get('EndpointV2')
 
-// // deploy.tags = [contractName]
 
-// // export default deploy
+//     const { address } = await deploy(contractName, {
+//         from: deployer,
+//         args: [
+//             tokenAdress,            
+//             endpointV2Deployment.address, // LayerZero's EndpointV2 address
+//             deployer, // owner
+//         ],
+//         log: true,
+//         skipIfAlreadyDeployed: false,
+//     })
+
+//     console.log(`Deployed Adapter: ${contractName}, network: ${hre.network.name}, address: ${address}`)
+// }
+
+// deploy.tags = [contractName]
+
+// export default deploy
 
 
 

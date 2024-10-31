@@ -11,8 +11,6 @@ contract WhaleAdapter is OFTAdapter {
         address _layerZeroEndpoint, // local endpoint address
         address _owner // token owner used as a delegate in LayerZero Endpoint
         ) OFTAdapter(_token, _layerZeroEndpoint, _owner) Ownable(_owner) {
-            //
-            // your custom contract logic here
-            //
+            
         }
 }
