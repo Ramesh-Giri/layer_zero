@@ -13,7 +13,7 @@ const BaseContract: OmniPointHardhat = {
 }
 
 const BscContract: OmniPointHardhat = {
-    eid: EndpointId.BSC_MAINNET,
+    eid: EndpointId.BSC_V2_MAINNET,
     contractName: 'WhaleOFT'
 }
 

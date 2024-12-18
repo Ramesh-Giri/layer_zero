@@ -65,7 +65,7 @@ const config: HardhatUserConfig = {
         },
         bsc: {
             // the LayerZero Endpoint ID
-            eid: EndpointId.BSC_MAINNET,
+            eid: EndpointId.BSC_V2_MAINNET,
             url: 'https://bsc-dataseed.binance.org/',
             accounts,
         },

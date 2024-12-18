@@ -57,7 +57,7 @@ const config = {
         },
         bsc: {
             // the LayerZero Endpoint ID
-            eid: lz_definitions_1.EndpointId.BSC_MAINNET,
+            eid: lz_definitions_1.EndpointId.BSC_V2_MAINNET,
             url: 'https://bsc-dataseed.binance.org/',
             accounts,
         },
