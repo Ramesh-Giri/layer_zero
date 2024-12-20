@@ -63,7 +63,7 @@ const walletDestination = new ethers.Wallet(PRIVATE_KEY).connect(destinationProv
 const destinationProviderBSC = new ethers.providers.JsonRpcProvider(RPC_URL_DESTINATION_BSC);
 const walletDestinationBSC = new ethers.Wallet(PRIVATE_KEY).connect(destinationProviderBSC);
 
-const destinationBscAddress = '0xA8944F431c93D7922555C535eeB7bAd4136A9a52';  
+const destinationBscAddress = '0x10456F0788Bfba7405C89451bE257b11b490975E';  
 
 const destinationBscContract = new ethers.Contract(destinationBscAddress, OFT_ABI, walletDestinationBSC);
 
@@ -78,65 +78,6 @@ const walletAdapter = new ethers.Wallet(PRIVATE_KEY).connect(sourceProvider);
 const sourceAdapterAddress = '0xbB35A07481cC10382D486D97EcB7F878Dfba092e';
 
 const sourceAdapterContract = new ethers.Contract(sourceAdapterAddress, ADAPTER_ABI, walletAdapter);
-
-// Function to Set Enforced Options
-// Function to Set Enforced Options
-async function setEnforcedOptions() {
-    const Options = require('@layerzerolabs/lz-v2-utilities').Options;
-
-    // Define the options
-    const _options = Options.newOptions()
-        .addExecutorLzReceiveOption(1000000, 1);
-
-    // Encode options to hex string
-    const optionsData = _options.toHex();
-
-    console.log('Enforced options:', optionsData);
-
-    // Display structured data of options
-    console.log('Options Data:', JSON.stringify({ gasLimit: 1000000, msgValue: 1 }, null, 2));
-
-    console.log('Fetching the enforced options:');
-
-    const enforcedOptions = [
-        {
-            eid: DESTINATION_ENDPOINT_ID,
-            msgType: 1,
-            options: optionsData
-        },
-        {
-            eid: DESTINATION_ENDPOINT_ID_BSC,
-            msgType: 1,
-            options: optionsData
-        }
-    ];
-
-    try {
-        // const nonce = await sourceProvider.getTransactionCount(walletSource.address, 'latest'); // Get the current nonce
-
-        // console.log('Sending transaction with nonce:', nonce);
-        // const txResponse = await sourceAdapterContract.setEnforcedOptions(enforcedOptions, {
-        //     gasLimit: 1500000, // Adjusted gas limit if needed
-        //     gasPrice: ethers.utils.parseUnits("23", "gwei"), // Adjust gas price if needed
-        //     nonce: nonce // Explicitly set the nonce
-        // });
-
-        // console.log('Transaction response:', txResponse);
-        // console.log('Waiting for transaction to be mined...');
-        // const receipt = await txResponse.wait();
-        // console.log('Transaction confirmed in block:', receipt.blockNumber);
-
-
-        
-        // await estimateSendFees(DESTINATION_ENDPOINT_ID, "2000", false, optionsData);
-
-        //sending to bsc
-        await estimateSendFees(DESTINATION_ENDPOINT_ID_BSC, "2000", false, optionsData);
-
-    } catch (error) {
-        console.error('Error setting enforced options:', error);
-    }
-}
 
 
 async function setPeerContracts() {
@@ -195,37 +136,92 @@ async function setPeerContracts() {
         }
         
 
-        // Ethereum OFT to BSC OFT and vice versa
-        // try {
-        //     const isEthOFTPeerOfBscOFT = await destinationBscContract.isPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
-        //     const isBscOFTPeerOfEthOFT = await destinationOFTContract.isPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32);
+       // Ethereum OFT to BSC OFT and vice versa
+        try {
+            const isEthOFTPeerOfBscOFT = await destinationBscContract.isPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
+            const isBscOFTPeerOfEthOFT = await destinationOFTContract.isPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32);
 
-        //     if (!isEthOFTPeerOfBscOFT || !isBscOFTPeerOfEthOFT) {
-        //         console.log("Pairing Ethereum OFT to BSC OFT and vice versa...");
+            if (!isEthOFTPeerOfBscOFT || !isBscOFTPeerOfEthOFT) {
+                console.log("Pairing Ethereum OFT to BSC OFT and vice versa...");
 
-        //         if (!isEthOFTPeerOfBscOFT) {
+                if (!isEthOFTPeerOfBscOFT) {
                     
-        //             const txEthOFTToBscOFT = await destinationOFTContract.setPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32);
-        //             await txEthOFTToBscOFT.wait();
-        //             console.log("Ethereum OFT to BSC OFT paired");
-        //         }
+                    const txEthOFTToBscOFT = await destinationOFTContract.setPeer(DESTINATION_ENDPOINT_ID_BSC, destinationBscOFTBytes32);
+                    await txEthOFTToBscOFT.wait();
+                    console.log("Ethereum OFT to BSC OFT paired");
+                }
 
-        //         if (!isBscOFTPeerOfEthOFT) {
+                if (!isBscOFTPeerOfEthOFT) {
                                         
                     
-        //             const txBscOFTToEthOFT = await destinationBscContract.setPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
-        //             await txBscOFTToEthOFT.wait();
-        //             console.log("BSC OFT to Ethereum OFT paired");
-        //         }
-        //     }
-        // } catch (error) {
-        //     console.error("An error occurred:", error);
-        // }
+                    const txBscOFTToEthOFT = await destinationBscContract.setPeer(DESTINATION_ENDPOINT_ID, destinationOFTBytes32);
+                    await txBscOFTToEthOFT.wait();
+                    console.log("BSC OFT to Ethereum OFT paired");
+                }
+            }else {
+                console.log("Already paired Ethereum OFT to BSC OFT");
+            }
+        } catch (error) {
+            console.error("An error occurred:", error);
+        }
 
     } catch (error) {
         console.error("An error occurred:", error);
     }
 }
+
+async function setEnforcedOptions(destinationEndpointId: string) {
+    const Options = require('@layerzerolabs/lz-v2-utilities').Options;
+
+    // Define the options
+    const _options = Options.newOptions()
+        .addExecutorLzReceiveOption(1000000, 1);
+
+    // Encode options to hex string
+    const optionsData = _options.toHex();
+
+    console.log('Enforced options:', optionsData);
+
+    // Display structured data of options
+    console.log('Options Data:', JSON.stringify({ gasLimit: 1000000, msgValue: 1 }, null, 2));
+
+    console.log('Fetching the enforced options:');
+
+    const enforcedOptions = [
+        {
+            eid: destinationEndpointId,
+            msgType: 1,
+            options: optionsData
+        },
+      
+    ];
+
+    try {
+        const nonce = await sourceProvider.getTransactionCount(walletSource.address, 'latest'); // Get the current nonce
+
+        console.log('Sending transaction with nonce:', nonce);
+        const txResponse = await sourceAdapterContract.setEnforcedOptions(enforcedOptions, {
+            gasLimit: 1500000, // Adjusted gas limit if needed
+            gasPrice: ethers.utils.parseUnits("23", "gwei"), // Adjust gas price if needed
+            nonce: nonce // Explicitly set the nonce
+        });
+
+        console.log('Transaction response:', txResponse);
+        console.log('Waiting for transaction to be mined...');
+        const receipt = await txResponse.wait();
+        console.log('Transaction confirmed in block:', receipt.blockNumber);
+
+
+       //sending to eth from base 
+       await estimateSendFees(destinationEndpointId, "1000000", false, optionsData);
+
+
+
+    } catch (error) {
+        console.error('Error setting enforced options:', error);
+    }
+}
+
 
 
 async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boolean, encodedOptions: any) {
@@ -275,7 +271,7 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
 
             console.log(`Estimated fees: ${ethers.utils.formatUnits(feeEstimate.nativeFee, "ether")} ETH, ${ethers.utils.formatUnits(feeEstimate.lzTokenFee, 18)} LZT`);
 
-            await sendTokensToDestination(amountToSend, feeEstimate, encodedOptions);
+            await sendTokensToDestination(amountToSend, feeEstimate, encodedOptions, dstEid);
 
         }catch (error: any){
             console.error(`Error geting quote fees: ${error}`);
@@ -293,7 +289,7 @@ async function estimateSendFees(dstEid: any, amountToSend: string, isBase: boole
 
     // Uncommit this to send tokens.
 
-async function sendTokensToDestination(amountToSend: any, msgFee: any, encodedOptions: any) {
+async function sendTokensToDestination(amountToSend: any, msgFee: any, encodedOptions: any, dstEid: string) {
     try {
         // Validate input parameters
         if (!amountToSend || parseFloat(amountToSend) <= 0) {
@@ -308,7 +304,7 @@ async function sendTokensToDestination(amountToSend: any, msgFee: any, encodedOp
 
         // Prepare the send parameters
         const sendParam = {
-            dstEid: DESTINATION_ENDPOINT_ID,
+            dstEid: dstEid,
             to: ethers.utils.hexZeroPad(walletSource.address, 32),
             amountLD: approvalAmount,
             minAmountLD: approvalAmount,
@@ -417,9 +413,11 @@ async function sendTokensToDestination(amountToSend: any, msgFee: any, encodedOp
 
     try {
 
-        await setPeerContracts();
+        // await setPeerContracts();
 
-    //   await setEnforcedOptions();
+      await setEnforcedOptions(DESTINATION_ENDPOINT_ID_BSC);
+
+    //   await setEnforcedOptions(DESTINATION_ENDPOINT_ID);
 
         // Estimate send fees
 
